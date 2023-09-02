@@ -51,7 +51,14 @@ public:
             }
 
             void operator()(const MulBinExprNode* mulBinExpr) const {
-                generator->fail("Multiplication not yet implemented");
+                generator->generateExpr(mulBinExpr->lhs);
+                generator->generateExpr(mulBinExpr->rhs);
+
+                generator->pop("rax");
+                generator->pop("rbx");
+
+                generator->m_asmOutput << "    imul rax, rbx\n";
+                generator->push("rax");
             }
         };
 

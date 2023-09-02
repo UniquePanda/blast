@@ -7,12 +7,15 @@
 enum class TokenType {
     exit, let, ident, int_lit,
     eq, open_paren, close_paren, semi,
-    plus,
+    plus, star,
 };
 
 struct Token {
+    static const size_t MAX_PRECEDENCE = 2;
+
     TokenType type;
     std::optional<std::string> value {};
+    size_t precedence = MAX_PRECEDENCE;
 };
 
 class Tokenizer {
@@ -32,7 +35,7 @@ public:
                 }
 
                 if (buf == "exit") {
-                    tokens.push_back({ .type = TokenType::exit });
+                    tokens.push_back({ .type = TokenType::exit});
                     buf.clear();
                     continue;
                 } else if (buf == "let") {
@@ -67,11 +70,15 @@ public:
                 tokens.push_back({ .type = TokenType::close_paren });
                 continue;
             } else if (peek().value() == ';') {
-                tokens.push_back({.type = TokenType::semi});
+                tokens.push_back({ .type = TokenType::semi });
                 consume();
                 continue;
             } else if (peek().value() == '+') {
-                tokens.push_back({ .type = TokenType::plus });
+                tokens.push_back({ .type = TokenType::plus, .precedence = 0 });
+                consume();
+                continue;
+            } else if (peek().value() == '*') {
+                tokens.push_back({ .type = TokenType::star, .precedence = 1 });
                 consume();
                 continue;
             } else if (std::isspace(peek().value())) {

@@ -7,6 +7,8 @@
 #include "arenaAllocator.hpp"
 #include "tokenizer.hpp"
 
+
+
 struct IntLitTermNode {
     Token int_lit;
 };
@@ -85,21 +87,33 @@ public:
         }
     }
 
-    std::optional<ExprNode*> parseExpr() {
+    std::optional<ExprNode*> parseExpr(size_t precedence = 0) {
         if (!peek().has_value()) {
             return {};
         }
 
-        if (auto term = parseTerm()) {
+        if (precedence >= Token::MAX_PRECEDENCE) {
+            if (auto term = parseTerm()) {
+                auto expr = m_allocator.alloc<ExprNode>();
+                expr->var = term.value();
+                return expr;
+            } else {
+                return {};
+            }
+        }
+
+        if (auto lhsExpr = parseExpr(precedence + 1)) {
+            if (peek().value().precedence != precedence) {
+                return lhsExpr;
+            }
+
             if (peek().value().type == TokenType::plus) {
                 auto binExpr = m_allocator.alloc<BinExprNode>();
                 auto sumBinExpr = m_allocator.alloc<SumBinExprNode>();
-                auto lhsExpr = m_allocator.alloc<ExprNode>();
-                lhsExpr->var = term.value();
-                sumBinExpr->lhs = lhsExpr;
+                sumBinExpr->lhs = lhsExpr.value();
                 consume();
 
-                if (auto rhs = parseExpr()) {
+                if (auto rhs = parseExpr(precedence)) {
                     sumBinExpr->rhs = rhs.value();
                     binExpr->var = sumBinExpr;
                     auto expr = m_allocator.alloc<ExprNode>();
@@ -108,10 +122,23 @@ public:
                 } else {
                     failBinaryRHS();
                 }
+            } else if(peek().value().type == TokenType::star) {
+                auto binExpr = m_allocator.alloc<BinExprNode>();
+                auto mulBinExpr = m_allocator.alloc<MulBinExprNode>();
+                mulBinExpr->lhs = lhsExpr.value();
+                consume();
+
+                if (auto rhs = parseExpr(precedence)) {
+                    mulBinExpr->rhs = rhs.value();
+                    binExpr->var = mulBinExpr;
+                    auto expr = m_allocator.alloc<ExprNode>();
+                    expr->var = binExpr;
+                    return expr;
+                } else {
+                    failBinaryRHS();
+                }
             } else {
-                auto expr = m_allocator.alloc<ExprNode>();
-                expr->var = term.value();
-                return expr;
+                failUnsupportedBinaryOperator();
             }
         } else {
             return {};
