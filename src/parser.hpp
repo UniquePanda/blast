@@ -87,6 +87,38 @@ public:
         }
     }
 
+    template <typename T> T* parseSpecificBinExpr(ExprNode *lhsExpr, size_t precedence) {
+        auto specificBinExpr = m_allocator.alloc<T>();
+        specificBinExpr->lhs = lhsExpr;
+
+        if (auto rhs = parseExpr(precedence)) {
+            specificBinExpr->rhs = rhs.value();
+            return specificBinExpr;
+        } else {
+            failBinaryRHS();
+        }
+
+        return {};
+    }
+
+    std::optional<BinExprNode*> parseBinExpr(TokenType tokenType, ExprNode *lhsExpr, size_t precedence) {
+        consume();
+        auto binExpr = m_allocator.alloc<BinExprNode>();
+
+        switch (tokenType) {
+            case TokenType::plus:
+                binExpr->var = parseSpecificBinExpr<SumBinExprNode>(lhsExpr, precedence);
+                break;
+            case TokenType::star: 
+                binExpr->var = parseSpecificBinExpr<MulBinExprNode>(lhsExpr, precedence);
+                break;
+            default:
+                failUnsupportedBinaryOperator();
+        }
+
+        return binExpr;
+    }
+
     std::optional<ExprNode*> parseExpr(size_t precedence = 0) {
         if (!peek().has_value()) {
             return {};
@@ -107,38 +139,10 @@ public:
                 return lhsExpr;
             }
 
-            if (peek().value().type == TokenType::plus) {
-                auto binExpr = m_allocator.alloc<BinExprNode>();
-                auto sumBinExpr = m_allocator.alloc<SumBinExprNode>();
-                sumBinExpr->lhs = lhsExpr.value();
-                consume();
-
-                if (auto rhs = parseExpr(precedence)) {
-                    sumBinExpr->rhs = rhs.value();
-                    binExpr->var = sumBinExpr;
-                    auto expr = m_allocator.alloc<ExprNode>();
-                    expr->var = binExpr;
-                    return expr;
-                } else {
-                    failBinaryRHS();
-                }
-            } else if(peek().value().type == TokenType::star) {
-                auto binExpr = m_allocator.alloc<BinExprNode>();
-                auto mulBinExpr = m_allocator.alloc<MulBinExprNode>();
-                mulBinExpr->lhs = lhsExpr.value();
-                consume();
-
-                if (auto rhs = parseExpr(precedence)) {
-                    mulBinExpr->rhs = rhs.value();
-                    binExpr->var = mulBinExpr;
-                    auto expr = m_allocator.alloc<ExprNode>();
-                    expr->var = binExpr;
-                    return expr;
-                } else {
-                    failBinaryRHS();
-                }
-            } else {
-                failUnsupportedBinaryOperator();
+            if (auto binExpr = parseBinExpr(peek().value().type, lhsExpr.value(), precedence)) {
+                auto expr = m_allocator.alloc<ExprNode>();
+                expr->var = binExpr.value();
+                return expr;
             }
         } else {
             return {};
