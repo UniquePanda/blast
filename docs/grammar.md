@@ -11,6 +11,8 @@ $$
     [\text{Expr}] &\to
         \begin{cases}
             \text{SumBinExpr} \\
+            \text{SubBinExpr} \\
+            \text{MulBinExpr} \\
             \text{Term} \\
         \end{cases}
     \\
@@ -24,6 +26,12 @@ $$
         \begin{cases}
             [\text{Expr}] + [\text{Expr}] \\
             [\text{Expr}] + [\text{MulBinExpr}] \\
+        \end{cases}
+    \\
+    [\text{SubBinExpr}] &\to
+        \begin{cases}
+            [\text{Expr}] - [\text{Expr}] \\
+            [\text{Expr}] - [\text{MulBinExpr}] \\
         \end{cases}
     \\
     [\text{MulBinExpr}] &\to [\text{Expr}] * [\text{Expr}] \\

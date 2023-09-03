@@ -50,6 +50,17 @@ public:
                 generator->push("rax");
             }
 
+            void operator()(const SubBinExprNode* subBinExpr) const {
+                generator->generateExpr(subBinExpr->lhs);
+                generator->generateExpr(subBinExpr->rhs);
+
+                generator->pop("rax");
+                generator->pop("rbx");
+
+                generator->m_asmOutput << "    sub rbx, rax \n";
+                generator->push("rbx");
+            }
+
             void operator()(const MulBinExprNode* mulBinExpr) const {
                 generator->generateExpr(mulBinExpr->lhs);
                 generator->generateExpr(mulBinExpr->rhs);

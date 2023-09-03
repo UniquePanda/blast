@@ -24,13 +24,18 @@ struct SumBinExprNode {
     ExprNode* rhs;
 };
 
+struct SubBinExprNode {
+    ExprNode* lhs;
+    ExprNode* rhs;
+};
+
 struct MulBinExprNode {
     ExprNode* lhs;
     ExprNode* rhs;
 };
 
 struct BinExprNode {
-    std::variant<SumBinExprNode*, MulBinExprNode*> var;
+    std::variant<SumBinExprNode*, SubBinExprNode*, MulBinExprNode*> var;
 };
 
 struct TermNode {
@@ -108,6 +113,9 @@ public:
         switch (tokenType) {
             case TokenType::plus:
                 binExpr->var = parseSpecificBinExpr<SumBinExprNode>(lhsExpr, precedence);
+                break;
+            case TokenType::minus:
+                binExpr->var = parseSpecificBinExpr<SubBinExprNode>(lhsExpr, precedence);
                 break;
             case TokenType::star: 
                 binExpr->var = parseSpecificBinExpr<MulBinExprNode>(lhsExpr, precedence);

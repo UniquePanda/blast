@@ -7,7 +7,7 @@
 enum class TokenType {
     exit, let, ident, int_lit,
     eq, open_paren, close_paren, semi,
-    plus, star,
+    plus, minus, star,
 };
 
 struct Token {
@@ -75,6 +75,10 @@ public:
                 continue;
             } else if (peek().value() == '+') {
                 tokens.push_back({ .type = TokenType::plus, .precedence = 0 });
+                consume();
+                continue;
+            } else if (peek().value() == '-') {
+                tokens.push_back({ .type = TokenType::minus, .precedence = 0 });
                 consume();
                 continue;
             } else if (peek().value() == '*') {
