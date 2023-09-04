@@ -1,4 +1,12 @@
 let a = 4 + 2 * 3; // 10
-let b = a * 2 - 2; // 18
-let c = b / 2; // 9
+let b = a * 2 - 2; /* 18 */
+/*
+The following results
+in a value of 9.
+*/
+let c = b / 2;
+/*
+* Now exit with
+* 9 as exit code.
+*/
 exit(c);

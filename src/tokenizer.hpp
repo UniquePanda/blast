@@ -93,6 +93,19 @@ public:
                     }
                     continue;
                 }
+                if (peek(1).value() == '*') {
+                    // Discard until */ because it's a multiline comment
+                    while (peek().has_value() && peek(1).has_value()) {
+                        if (peek().value() == '*' && peek(1).value() == '/') {
+                            consume();
+                            consume();
+                            break;
+                        }
+
+                        consume();
+                    }
+                    continue;
+                }
                 tokens.push_back({ .type = TokenType::slash, .precedence = 1 });
                 consume();
                 continue;
