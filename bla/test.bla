@@ -1,3 +1,4 @@
 let a = 4 + 2 * 3;
-let b = a * 2 - 1;
-exit(b);
+let b = a * 2 - 2;
+let c = b / 2;
+exit(c);

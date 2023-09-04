@@ -34,8 +34,13 @@ struct MulBinExprNode {
     ExprNode* rhs;
 };
 
+struct DivBinExprNode {
+    ExprNode* lhs;
+    ExprNode* rhs;
+};
+
 struct BinExprNode {
-    std::variant<SumBinExprNode*, SubBinExprNode*, MulBinExprNode*> var;
+    std::variant<SumBinExprNode*, SubBinExprNode*, MulBinExprNode*, DivBinExprNode*> var;
 };
 
 struct TermNode {
@@ -117,8 +122,11 @@ public:
             case TokenType::minus:
                 binExpr->var = parseSpecificBinExpr<SubBinExprNode>(lhsExpr, precedence);
                 break;
-            case TokenType::star: 
+            case TokenType::star:
                 binExpr->var = parseSpecificBinExpr<MulBinExprNode>(lhsExpr, precedence);
+                break;
+            case TokenType::slash:
+                binExpr->var = parseSpecificBinExpr<DivBinExprNode>(lhsExpr, precedence);
                 break;
             default:
                 failUnsupportedBinaryOperator();

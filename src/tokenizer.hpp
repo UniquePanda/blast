@@ -7,7 +7,7 @@
 enum class TokenType {
     exit, let, ident, int_lit,
     eq, open_paren, close_paren, semi,
-    plus, minus, star,
+    plus, minus, star, slash,
 };
 
 struct Token {
@@ -83,6 +83,10 @@ public:
                 continue;
             } else if (peek().value() == '*') {
                 tokens.push_back({ .type = TokenType::star, .precedence = 1 });
+                consume();
+                continue;
+            } else if (peek().value() == '/') {
+                tokens.push_back({ .type = TokenType::slash, .precedence = 1 });
                 consume();
                 continue;
             } else if (std::isspace(peek().value())) {

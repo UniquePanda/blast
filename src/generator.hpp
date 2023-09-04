@@ -71,6 +71,19 @@ public:
                 generator->m_asmOutput << "    imul rax, rbx\n";
                 generator->push("rax");
             }
+
+            void operator()(const DivBinExprNode* divBinExpr) const {
+                generator->generateExpr(divBinExpr->lhs);
+                generator->generateExpr(divBinExpr->rhs);
+
+                generator->pop("rbx"); // Divisor
+                generator->pop("rax"); // Divident
+                generator->m_asmOutput << "    cqo\n";
+
+                generator->m_asmOutput << "    idiv rbx\n";
+                generator->push("rax");
+                // TODO: Remainder is in rdx. Can't be used right now anyways as we only print exit code.
+            }
         };
 
         struct ExprVisitor {
