@@ -86,6 +86,13 @@ public:
                 consume();
                 continue;
             } else if (peek().value() == '/') {
+                if (peek(1).value() == '/') {
+                    // Discard until new line, because it's a comment
+                    while (peek().has_value() && peek().value() != '\n') {
+                        consume();
+                    }
+                    continue;
+                }
                 tokens.push_back({ .type = TokenType::slash, .precedence = 1 });
                 consume();
                 continue;
