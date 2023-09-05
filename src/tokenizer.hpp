@@ -37,15 +37,12 @@ public:
                 if (buf == "exit") {
                     tokens.push_back({ .type = TokenType::exit});
                     buf.clear();
-                    continue;
                 } else if (buf == "let") {
                     tokens.push_back({ .type = TokenType::let });
                     buf.clear();
-                    continue;
                 } else {
                     tokens.push_back({ .type = TokenType::ident, .value = buf });
                     buf.clear();
-                    continue;
                 }
             } else if (std::isdigit(peek().value())) {
                 buf.push_back(consume());
@@ -56,44 +53,34 @@ public:
 
                 tokens.push_back({.type = TokenType::int_lit, .value = buf});
                 buf.clear();
-                continue;
             } else if (peek().value() == '=') {
                 tokens.push_back({.type = TokenType::eq});
                 consume();
-                continue;
             } else if (peek().value() == '(') {
                 consume();
                 tokens.push_back({ .type = TokenType::open_paren });
-                continue;
             }else if (peek().value() == ')') {
                 consume();
                 tokens.push_back({ .type = TokenType::close_paren });
-                continue;
             } else if (peek().value() == ';') {
                 tokens.push_back({ .type = TokenType::semi });
                 consume();
-                continue;
             } else if (peek().value() == '+') {
                 tokens.push_back({ .type = TokenType::plus, .precedence = 0 });
                 consume();
-                continue;
             } else if (peek().value() == '-') {
                 tokens.push_back({ .type = TokenType::minus, .precedence = 0 });
                 consume();
-                continue;
             } else if (peek().value() == '*') {
                 tokens.push_back({ .type = TokenType::star, .precedence = 1 });
                 consume();
-                continue;
             } else if (peek().value() == '/') {
                 if (peek(1).value() == '/') {
                     // Discard until new line, because it's a comment
                     while (peek().has_value() && peek().value() != '\n') {
                         consume();
                     }
-                    continue;
-                }
-                if (peek(1).value() == '*') {
+                } else if (peek(1).value() == '*') {
                     // Discard until */ because it's a multiline comment
                     while (peek().has_value() && peek(1).has_value()) {
                         if (peek().value() == '*' && peek(1).value() == '/') {
@@ -104,18 +91,16 @@ public:
 
                         consume();
                     }
-                    continue;
+                } else {
+                    tokens.push_back({ .type = TokenType::slash, .precedence = 1 });
+                    consume();
                 }
-                tokens.push_back({ .type = TokenType::slash, .precedence = 1 });
-                consume();
-                continue;
             } else if (std::isspace(peek().value())) {
                 consume();
-                continue;
+            } else {
+                std::cerr << "Unknown character <" << peek().value() << ">" << std::endl;
+                exit(EXIT_FAILURE);
             }
-
-            std::cerr << "Unknown character <" << peek().value() << ">" << std::endl;
-            exit(EXIT_FAILURE);
         }
 
         m_index = 0;
