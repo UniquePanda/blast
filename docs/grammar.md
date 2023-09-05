@@ -5,7 +5,7 @@ $$
     [\text{Stmt}] &\to
         \begin{cases}
             \text{let}\space\text{ident} = \text{[Expr]}; \\
-            \text{exit}(\text{[Expr]}); \\
+            \text{[BuiltInFunc]}(\text{[Expr]}); \\
         \end{cases}
     \\
     [\text{Expr}] &\to
@@ -20,7 +20,7 @@ $$
         \begin{cases}
             \text{ident} \\
             \text{int\_lit} \\
-            [\text{(Expr)}] \\
+            ([\text{Expr}]) \\
         \end{cases}
     \\
     [\text{SumBinExpr}] &\to
@@ -36,6 +36,12 @@ $$
         \end{cases}
     \\
     [\text{MulBinExpr}] &\to [\text{Expr}] * [\text{Expr}] \\
+    [\text{BuiltInFunc}] &\to
+        \begin{cases}
+            \text{exit} \\
+            \text{print} \\
+        \end{cases}
+    \\
 \end{align}
 
 $$

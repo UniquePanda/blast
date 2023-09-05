@@ -53,7 +53,8 @@ struct ExprNode {
     std::variant<TermNode*, BinExprNode*> var;
 };
 
-struct ExitStmtNode {
+struct BuiltInFuncStmtNode {
+    std::string funcName;
     ExprNode* expr;
 };
 
@@ -63,7 +64,7 @@ struct LetStmtNode {
 };
 
 struct StmtNode {
-    std::variant<ExitStmtNode*, LetStmtNode*> var;
+    std::variant<BuiltInFuncStmtNode*, LetStmtNode*> var;
 };
 
 struct ProgNode {
@@ -195,7 +196,7 @@ public:
             return {};
         }
 
-        if (peek().value().type == TokenType::exit) {
+        if (peek().value().type == TokenType::built_in_func) {
             if (!peek(1).has_value()) {
                 failUnexpectedEOF();
             }
@@ -204,13 +205,16 @@ public:
                 failMissingOpenParen();
             }
 
-            // exit and opening parenthesis
+            auto builtInFuncStmt = m_allocator.alloc<BuiltInFuncStmtNode>();
+            auto funcName = peek().value().value.value();
+            builtInFuncStmt->funcName = funcName;
+
+            // function name and opening parenthesis
             consume();
             consume();
 
-            auto exitStmt = m_allocator.alloc<ExitStmtNode>();
             if (auto exprNode = parseExpr()) {
-                exitStmt->expr = exprNode.value();
+                builtInFuncStmt->expr = exprNode.value();
             } else {
                 failInvalidExpr();
             }
@@ -222,13 +226,13 @@ public:
 
             consumeSemi();
 
-            if (peek().has_value()) {
+            if (builtInFuncStmt->funcName == "exit" && peek().has_value()) {
                 std::cerr << "Found code after exit()" << std::endl;
                 exit(EXIT_FAILURE);
             }
 
             auto stmt = m_allocator.alloc<StmtNode>();
-            stmt->var = exitStmt;
+            stmt->var = builtInFuncStmt;
             return stmt;
         } else if (peek().value().type == TokenType::let) {
             if (!peek(1).has_value()) {

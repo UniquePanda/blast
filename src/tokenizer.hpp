@@ -5,7 +5,7 @@
 #include <vector>
 
 enum class TokenType {
-    exit, let, ident, int_lit,
+    let, ident, int_lit, built_in_func,
     eq, open_paren, close_paren, semi,
     plus, minus, star, slash,
 };
@@ -17,6 +17,8 @@ struct Token {
     std::optional<std::string> value {};
     size_t precedence = MAX_PRECEDENCE;
 };
+
+const std::vector<std::string> BUILT_IN_FUNC_NAMES {"exit"};
 
 class Tokenizer {
 public:
@@ -34,16 +36,15 @@ public:
                     buf.push_back(consume());
                 }
 
-                if (buf == "exit") {
-                    tokens.push_back({ .type = TokenType::exit});
-                    buf.clear();
-                } else if (buf == "let") {
+                if (buf == "let") {
                     tokens.push_back({ .type = TokenType::let });
-                    buf.clear();
+                } else if (auto builtInFuncToken = evaluateBuiltInFunc(buf)) {
+                    tokens.push_back(builtInFuncToken.value());
                 } else {
                     tokens.push_back({ .type = TokenType::ident, .value = buf });
-                    buf.clear();
                 }
+
+                buf.clear();
             } else if (std::isdigit(peek().value())) {
                 buf.push_back(consume());
 
@@ -118,6 +119,17 @@ private:
 
     char consume() {
         return m_source.at(m_index++);
+    }
+
+    std::optional<Token> evaluateBuiltInFunc(std::string funcName) {
+        if (std::find(BUILT_IN_FUNC_NAMES.begin(), BUILT_IN_FUNC_NAMES.end(), funcName) == BUILT_IN_FUNC_NAMES.end()) {
+            return {};
+        }
+
+        Token token;
+        token.type = TokenType::built_in_func;
+        token.value = funcName;
+        return token;
     }
 
     const std::string m_source;

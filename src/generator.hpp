@@ -111,12 +111,16 @@ public:
         struct StmtVisitor {
             Generator* generator;
 
-            void operator()(const ExitStmtNode* exitStmt) const {
-                generator->generateExpr(exitStmt->expr);
+            void operator()(const BuiltInFuncStmtNode* builtInFuncStmt) const {
+                if (builtInFuncStmt->funcName == "exit") {
+                    generator->generateExpr(builtInFuncStmt->expr);
 
-                generator->m_asmOutput << "    mov rax, 60\n";
-                generator->pop("rdi");
-                generator->m_asmOutput << "    syscall\n";
+                    generator->m_asmOutput << "    mov rax, 60\n";
+                    generator->pop("rdi");
+                    generator->m_asmOutput << "    syscall\n";
+                } else {
+                    generator->failUnknownBuiltInFunc(builtInFuncStmt->funcName);
+                }
             }
 
             void operator()(const LetStmtNode* letStmt) const {
@@ -169,6 +173,10 @@ private:
 
     void failUndeclaredIdentifer(std::string identName) const {
         fail("Undeclared identifier: " + identName);
+    }
+
+    void failUnknownBuiltInFunc(std::string funcName) const {
+        fail("Unknown built in function: " + funcName);
     }
 
     struct Var {
