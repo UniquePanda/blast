@@ -20,6 +20,7 @@ $$
         \begin{cases}
             \text{ident} \\
             \text{int\_lit} \\
+            [\text{(Expr)}] \\
         \end{cases}
     \\
     [\text{SumBinExpr}] &\to

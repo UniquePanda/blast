@@ -2,11 +2,12 @@ let a = 4 + 2 * 3; // 10
 let b = a * 2 - 2; /* 18 */
 /*
 The following results
-in a value of 9.
+in a value of 20.
 */
-let c = b / 2;
+let c = 2 * b / 2 + 2;
+let d = c * (2 + 2 * (2 + 1)); // 160
 /*
 * Now exit with
-* 9 as exit code.
+* d as exit code.
 */
-exit(c);
+exit(d);

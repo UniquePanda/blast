@@ -29,6 +29,10 @@ public:
                 offset << "QWORD [rsp + " << (generator->m_stackSize - var.stackLoc - 1) * 8 << "]\n";
                 generator->push(offset.str());
             }
+
+            void operator()(const ParenTermNode* parenTerm) const {
+                generator->generateExpr(parenTerm->expr);
+            }
         };
 
         TermVisitor visitor({ .generator = this });

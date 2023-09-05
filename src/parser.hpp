@@ -7,7 +7,7 @@
 #include "arenaAllocator.hpp"
 #include "tokenizer.hpp"
 
-
+struct ExprNode;
 
 struct IntLitTermNode {
     Token int_lit;
@@ -17,7 +17,13 @@ struct IdentTermNode {
     Token ident;
 };
 
-struct ExprNode;
+struct ParenTermNode {
+    ExprNode* expr;
+};
+
+struct TermNode {
+    std::variant<IdentTermNode*, IntLitTermNode*, ParenTermNode*> var;
+};
 
 struct SumBinExprNode {
     ExprNode* lhs;
@@ -41,10 +47,6 @@ struct DivBinExprNode {
 
 struct BinExprNode {
     std::variant<SumBinExprNode*, SubBinExprNode*, MulBinExprNode*, DivBinExprNode*> var;
-};
-
-struct TermNode {
-    std::variant<IdentTermNode*, IntLitTermNode*> var;
 };
 
 struct ExprNode {
@@ -91,6 +93,27 @@ public:
             identTerm->ident = consume();
             auto term = m_allocator.alloc<TermNode>();
             term->var = identTerm;
+            return term;
+        } else if (peek().value().type == TokenType::open_paren) {
+            // Opening prenthesis
+            consume();
+
+            auto expr = parseExpr();
+
+            if (!expr.has_value()) {
+                failMissingExpr();
+            }
+
+            if (!peek().has_value() || peek().value().type != TokenType::close_paren) {
+                failMissingClosingParen();
+            }
+            // Closing prenthesis
+            consume();
+
+            auto parenTerm = m_allocator.alloc<ParenTermNode>();
+            parenTerm->expr = expr.value();
+            auto term = m_allocator.alloc<TermNode>();
+            term->var = parenTerm;
             return term;
         } else {
             return {};
@@ -295,6 +318,10 @@ private:
 
     void failInvalidExpr() const {
         fail("Invalid expression");
+    }
+
+    void failMissingExpr() const {
+        fail("Missing expression");
     }
 
     void failMissingIdent() const {
