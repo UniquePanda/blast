@@ -123,8 +123,40 @@ public:
                 } else if (builtInFuncStmt->funcName == "print") {
                     generator->pop("rdi"); // Input for uitoa
                     generator->m_asmOutput << "    call uitoa\n"; // rsi points to first char, rdx has string length
-                    generator->m_asmOutput << "    mov rdi, 1\n"; // file descriptor 1 (stdout) for sys_wrtie syscall
+
+                    // Move the stack pointer so the next syscall won't override the string.
+                    generator->m_asmOutput << "    sub rsp, rdx\n";
+                    generator->m_asmOutput << "    sub rsp, 8\n";
+
+                    // Perform the stdout write.
+                    generator->m_asmOutput << "    mov rdi, 1\n"; // file descriptor 1 (stdout) for sys_write syscall
                     generator->m_asmOutput << "    call sysWrite\n";
+
+                    // Reset stack pointer.
+                    generator->m_asmOutput << "    add rsp, 8\n";
+                    generator->m_asmOutput << "    add rsp, rdx\n";
+                } else if (builtInFuncStmt->funcName == "println") {
+                    generator->pop("rdi"); // Input for uitoa
+                    generator->m_asmOutput << "    call uitoa\n"; // rsi points to first char, rdx has string length
+
+                    // Move rsi before the generated string, add a linebreak and move rsi back. As the string is read
+                    // from back to front, this will actually put the linebreak behind the last character.
+                    generator->m_asmOutput << "    add rsi, rdx\n";
+                    generator->m_asmOutput << "    mov BYTE [rsi], 0xa\n";
+                    generator->m_asmOutput << "    sub rsi, rdx\n";
+                    generator->m_asmOutput << "    inc edx\n"; // increase number of chars to read by 1
+
+                    // Move the stack pointer so the next syscall won't override the string.
+                    generator->m_asmOutput << "    sub rsp, rdx\n";
+                    generator->m_asmOutput << "    sub rsp, 8\n";
+
+                    // Perform the stdout write.
+                    generator->m_asmOutput << "    mov rdi, 1\n"; // file descriptor 1 (stdout) for sys_write syscall
+                    generator->m_asmOutput << "    call sysWrite\n";
+
+                    // Reset stack pointer.
+                    generator->m_asmOutput << "    add rsp, 8\n";
+                    generator->m_asmOutput << "    add rsp, rdx\n";
                 } else {
                     generator->failUnknownBuiltInFunc(builtInFuncStmt->funcName);
                 }
@@ -177,31 +209,31 @@ private:
     }
 
     /*
-    * Input in edi
+    * Input:
+    *     edi: integer to convert
     * Output:
-    *     rsi (points to first char) -> overwritten by stack pushes!
+    *     rsi (points to first char)
     *     rdx (contains number of chars)
     * Clobbers rsi, rax, rcx, rdx
-    * Pushes to stack: 1
     */
     void addUnsignedIntToAsciiAsm() {
         // reference: https://stackoverflow.com/a/46301894
         m_asmOutput << "uitoa:\n";
 
-        m_asmOutput << "    mov eax, edi\n"; // Expects int to convert to be in edi
+        m_asmOutput << "    mov rax, rdi\n"; // Expects int to convert to be in edi
         m_asmOutput << "    mov ecx, 0xa\n"; // Store 10 as base
         m_asmOutput << "    mov rsi, rsp\n"; // Stack pointer to rsi
 
         m_asmOutput << ".digitToAsciiLoop:\n";
         m_asmOutput << "    xor edx, edx\n";
-        m_asmOutput << "    div ecx\n"; // divide eax by 10, remainder in edx
+        m_asmOutput << "    div rcx\n"; // divide eax by 10, remainder in edx
         m_asmOutput << "    add edx, '0'\n"; // Convert remainder to ascii (adding ascii value of 0)
         m_asmOutput << "    dec rsi\n"; // move stack pointer down
         m_asmOutput << "    mov [rsi], dl\n"; // add lowest byte from edx (ascii value of remainder) to stack
-        m_asmOutput << "    test eax, eax\n"; // ZeroFlag set to 1 if eax is 0
+        m_asmOutput << "    test rax, rax\n"; // ZeroFlag set to 1 if eax is 0
         m_asmOutput << "    jnz .digitToAsciiLoop\n"; // process next digit if still number (non-zero) in eax
-        m_asmOutput << "    lea edx, [rsp]\n"; // address of rsp + 1 (address of the \n char) to ecx
-        m_asmOutput << "    sub edx, esi\n"; // subtract address in exi from ecx to get length between last and first char
+        m_asmOutput << "    lea edx, [rsp]\n"; // address of rsp to edx
+        m_asmOutput << "    sub edx, esi\n"; // subtract address in esi from edx to get length between last and first char
         m_asmOutput << "    ret\n";
         m_asmOutput << "\n";
 

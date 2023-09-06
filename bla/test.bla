@@ -1,9 +1,12 @@
-let a = 4 + 2 * 3; // 10
-let b = a * 2 - 2; /* 18 */
 /*
-The following results
-in a value of 20.
+* A program testing all the language features.
+ * Like this multiline comment. :D
 */
-let c = 2 * b / 2 + 2;
+let a = 4 + 2 * 3; // 10
+let b = a * 2 - 2; // 18
+let c = 2 * b / 2 + 2; // 20
 let d = c * (2 + 2 * (2 + 1)); // 160
-print(d);
+println(d + c); // print 180 with a line break
+let z = a * b + 2;
+print(z); // print 182 without a line break
+println(12);

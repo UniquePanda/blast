@@ -38,8 +38,9 @@ $$
     [\text{MulBinExpr}] &\to [\text{Expr}] * [\text{Expr}] \\
     [\text{BuiltInFunc}] &\to
         \begin{cases}
-            \text{exit} \\
-            \text{print} \\
+            \text{exit} & \text{Exit program with given exit code} \\
+            \text{print} & \text{Print given input to stdout} \\
+            \text{println} & \text{Print given input with added line break to stdout} \\
         \end{cases}
     \\
 \end{align}
