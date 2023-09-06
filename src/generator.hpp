@@ -112,12 +112,14 @@ public:
             Generator* generator;
 
             void operator()(const BuiltInFuncStmtNode* builtInFuncStmt) const {
-                if (builtInFuncStmt->funcName == "exit") {
-                    generator->generateExpr(builtInFuncStmt->expr);
+                generator->generateExpr(builtInFuncStmt->expr);
 
-                    generator->m_asmOutput << "    mov rax, 60\n";
-                    generator->pop("rdi");
+                if (builtInFuncStmt->funcName == "exit") {
+                    generator->m_asmOutput << "    mov rax, 60\n"; // sys_exit
+                    generator->pop("rdi"); // exit code
                     generator->m_asmOutput << "    syscall\n";
+
+                    generator->m_containsCustomExitCall = true;
                 } else {
                     generator->failUnknownBuiltInFunc(builtInFuncStmt->funcName);
                 }
@@ -144,9 +146,11 @@ public:
             generateStmt(stmt);
         }
 
-        m_asmOutput << "    mov rax, 60\n";
-        m_asmOutput << "    mov rdi, 0\n";
-        m_asmOutput << "    syscall\n";
+        if (!m_containsCustomExitCall) {
+            m_asmOutput << "    mov rax, 60\n";
+            m_asmOutput << "    mov rdi, 0\n";
+            m_asmOutput << "    syscall\n";
+        }
 
         return m_asmOutput.str();
     }
@@ -185,6 +189,7 @@ private:
 
     const ProgNode m_prog;
     std::stringstream m_asmOutput;
+    bool m_containsCustomExitCall = false;
     size_t m_stackSize = 0;
     std::unordered_map<std::string, Var> m_vars {};
 };
