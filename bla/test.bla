@@ -6,8 +6,4 @@ in a value of 20.
 */
 let c = 2 * b / 2 + 2;
 let d = c * (2 + 2 * (2 + 1)); // 160
-/*
-* Now exit with
-* d as exit code.
-*/
-exit(d);
+print(d);

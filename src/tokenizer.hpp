@@ -18,7 +18,7 @@ struct Token {
     size_t precedence = MAX_PRECEDENCE;
 };
 
-const std::vector<std::string> BUILT_IN_FUNC_NAMES {"exit"};
+const std::vector<std::string> BUILT_IN_FUNC_NAMES {"print", "exit"};
 
 class Tokenizer {
 public:
