@@ -5,8 +5,8 @@
 #include <vector>
 
 enum class TokenType {
-    let, ident, int_lit, built_in_func,
-    eq, open_paren, close_paren, semi,
+    let, ident, int_lit, str_lit, built_in_func,
+    eq, open_paren, close_paren, semi, quot,
     plus, minus, star, slash,
 };
 
@@ -54,6 +54,47 @@ public:
 
                 tokens.push_back({.type = TokenType::int_lit, .value = buf});
                 buf.clear();
+            } else if (peek().value() == '"') {
+                tokens.push_back({.type = TokenType::quot});
+                consume();
+                // Consume until next quotation mark, because it's a string.
+                while (peek().has_value()) {
+                    if (peek().value() == '\\') {
+                        int slashCount = 0;
+                        while (peek().has_value() && peek().value() == '\\') {
+                            slashCount++;
+                            if (slashCount % 2 == 0) {
+                                buf.push_back(consume());
+                            } else {
+                                consume();
+                            }
+                        }
+
+                        if (slashCount % 2 != 0) {
+                            if (peek().value() == '"') {
+                                buf.push_back(consume());
+                                continue;
+                            } else {
+                                failUnxpectedEscape();
+                            }
+                        }
+                    }
+
+                    if (peek().value() == '"') {
+                        break;
+                    }
+
+                    buf.push_back(consume());
+                }
+
+                tokens.push_back({.type = TokenType::str_lit, .value = buf});
+                buf.clear();
+
+                // Consume ending quotation mark.
+                if (peek().has_value()) {
+                    tokens.push_back({.type = TokenType::quot});
+                    consume();
+                }
             } else if (peek().value() == '=') {
                 tokens.push_back({.type = TokenType::eq});
                 consume();
@@ -99,8 +140,7 @@ public:
             } else if (std::isspace(peek().value())) {
                 consume();
             } else {
-                std::cerr << "Unknown character <" << peek().value() << ">" << std::endl;
-                exit(EXIT_FAILURE);
+                failUnknownChar(peek().value());
             }
         }
 
@@ -110,7 +150,7 @@ public:
 
 private:
     [[nodiscard]] std::optional<char> peek(int offset = 0) const {
-        if (m_index + offset >= m_source.length()) {
+        if (m_index + offset >= 0 && m_index + offset >= m_source.length()) {
             return {};
         } else {
             return m_source.at(m_index + offset);
@@ -130,6 +170,19 @@ private:
         token.type = TokenType::built_in_func;
         token.value = funcName;
         return token;
+    }
+
+    void fail(std::string msg) const {
+        std::cerr << msg << std::endl;
+        exit(EXIT_FAILURE); 
+    }
+
+    void failUnxpectedEscape() const {
+        fail("Unexpected escape sequence");
+    }
+
+    void failUnknownChar(char unknownChar) const {
+        fail("Unknown character: " + std::string(1, unknownChar));
     }
 
     const std::string m_source;

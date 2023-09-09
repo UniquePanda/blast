@@ -20,6 +20,7 @@ $$
         \begin{cases}
             \text{ident} \\
             \text{int\_lit} \\
+            "\text{str\_lit}" \\
             ([\text{Expr}]) \\
         \end{cases}
     \\

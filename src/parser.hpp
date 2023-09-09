@@ -13,6 +13,10 @@ struct IntLitTermNode {
     Token int_lit;
 };
 
+struct StrLitTermNode {
+    Token str_lit;
+};
+
 struct IdentTermNode {
     Token ident;
 };
@@ -22,7 +26,7 @@ struct ParenTermNode {
 };
 
 struct TermNode {
-    std::variant<IdentTermNode*, IntLitTermNode*, ParenTermNode*> var;
+    std::variant<IdentTermNode*, IntLitTermNode*, StrLitTermNode*, ParenTermNode*> var;
 };
 
 struct SumBinExprNode {
@@ -88,6 +92,27 @@ public:
             intLitTerm->int_lit = consume();
             auto term = m_allocator.alloc<TermNode>();
             term->var = intLitTerm;
+            return term;
+        } else if (peek().value().type == TokenType::quot) {
+            if (!peek(1).has_value() || peek(1).value().type != TokenType::str_lit) {
+                failInvalidExpr();
+            }
+
+            if (!peek(2).has_value() || peek(2).value().type != TokenType::quot) {
+                failMissingQuot();
+            }
+
+            // Opening quotation mark.
+            consume();
+
+            auto strLitTerm = m_allocator.alloc<StrLitTermNode>();
+            strLitTerm->str_lit = consume();
+            auto term = m_allocator.alloc<TermNode>();
+            term->var = strLitTerm;
+
+            // Closing quotation mark.
+            consume();
+
             return term;
         } else if (peek().value().type == TokenType::ident) {
             auto identTerm = m_allocator.alloc<IdentTermNode>();
@@ -350,6 +375,10 @@ private:
 
     void failMissingClosingParen() const {
         fail("Missing closing parenthesis");
+    }
+
+    void failMissingQuot() const {
+        fail("Missing quotation mark");
     }
 
     void failMissingSemi() const {

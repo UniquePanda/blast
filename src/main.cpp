@@ -27,11 +27,11 @@ int main(int argc, char const* argv[]) {
 
     Tokenizer tokenizer(std::move(contents));
     std::vector<Token> tokens = tokenizer.tokenize();
-    std::cout << "Tokenization successful" << std::endl;
+    std::cout << "  Tokenization successful" << std::endl;
 
     Parser parser(std::move(tokens));
     std::optional<ProgNode> tree = parser.parseProg();
-    std::cout << "Parsing successful" << std::endl;
+    std::cout << "  Parsing successful" << std::endl;
 
     if (!tree.has_value()) {
         std::cerr << "No exit statement found" << std::endl;
@@ -39,7 +39,7 @@ int main(int argc, char const* argv[]) {
     }
 
     Generator generator(tree.value());
-    std::cout << "Generation successful" << std::endl;
+    std::cout << "  Generation successful" << std::endl;
 
     {
         std::fstream file("../blaOut/out.asm", std::ios::out);
@@ -49,7 +49,7 @@ int main(int argc, char const* argv[]) {
         system("nasm -felf64 ../blaOut/out.asm");
         system("ld -o ../blaOut/out ../blaOut/out.o");
     }
-    std::cout << "Compiling successful" << std::endl;
+    std::cout << "  Compiling successful\n|==============================|\n" << std::endl;
 
     return EXIT_SUCCESS;
 }
