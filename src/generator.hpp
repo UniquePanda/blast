@@ -99,11 +99,11 @@ public:
                 generator->generateExpr(subBinExpr->lhs);
                 generator->generateExpr(subBinExpr->rhs);
 
-                generator->popWithConstNoStrLit("rax");
                 generator->popWithConstNoStrLit("rbx");
+                generator->popWithConstNoStrLit("rax");
 
-                generator->m_codeSectionAsmOutput << "    sub rbx, rax \n";
-                generator->push("rbx");
+                generator->m_codeSectionAsmOutput << "    sub rax, rbx \n";
+                generator->push("rax");
             }
 
             void operator()(const MulBinExprNode* mulBinExpr) const {
@@ -121,13 +121,12 @@ public:
                 generator->generateExpr(divBinExpr->lhs);
                 generator->generateExpr(divBinExpr->rhs);
 
-                generator->popWithConstNoStrLit("rax"); // Divisor
-                generator->popWithConstNoStrLit("rbx"); // Divident
+                generator->popWithConstNoStrLit("rbx"); // Divisor
+                generator->popWithConstNoStrLit("rax"); // Divident
                 generator->m_codeSectionAsmOutput << "    cqo\n";
 
                 generator->m_codeSectionAsmOutput << "    idiv rbx\n";
                 generator->push("rax");
-                // TODO: Remainder is in rdx. Can't be used right now anyways as we only print exit code.
             }
         };
 
