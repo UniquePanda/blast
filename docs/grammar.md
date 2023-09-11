@@ -21,6 +21,7 @@ $$
             \text{ident} \\
             \text{int\_lit} \\
             "\text{str\_lit}" \\
+            \text{bool\_lit} \\
             ([\text{Expr}]) \\
         \end{cases}
     \\

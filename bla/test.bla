@@ -5,12 +5,13 @@
 println("# Begin of test program...");
 
 println("# Performing number assignments...");
+let zz = 3;
 let a = 4 + 2 * 3; // 10
 let b = a * 2 - 2; // 18
 let c = 2 * b / 2 + 2; // 20
 let d = c * (2 + 2 * (2 + 1)); // 160
 
-println("# Printing number addition (d + c), should be 180...");
+println("# Printing number addition, should be 180...");
 println(d + c);
 
 println("# Assigning another number, printing it without line break, should be 182...");
@@ -26,8 +27,28 @@ print("an inline string");
 println(" # Printing an empty string with linebreak...");
 println("");
 
-println("Producing and printing result of dinteger ivison with remainder (5 / 2)...");
+println("# Storing and printing result of integer divison (5 / 2 -> should be 2)...");
 let f = 5 / 2;
 println(f);
+
+println("# Storing and printing bool true...");
+let g = true;
+println(g);
+
+println("# Storing and printing bool false...");
+let h = false;
+println(h);
+
+println("# Printing both bools without linebreak...");
+print(g);
+print(h);
+
+println(" # Printing bools directly without linebreak...");
+print(true);
+print(false);
+
+println(" # Printing bools directly with linebreak...");
+println(true);
+println(false);
 
 println("# Test program finished!");

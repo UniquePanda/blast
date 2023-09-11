@@ -16,16 +16,31 @@ public:
 
             void operator()(const IntLitTermNode* intLitTerm) const {
                 generator->m_codeSectionAsmOutput << "    mov rax, " << intLitTerm->int_lit.value.value() << "\n";
-                generator->push("rax");
+                generator->pushInternalIntVar("rax");
             }
 
             void operator()(const StrLitTermNode* strLitTerm) const {
-                auto dataLocation = addStringToDataSection(strLitTerm->str_lit.value.value());
+                auto dataLoc = addStringToDataSection(strLitTerm->str_lit.value.value());
 
-                generator->m_codeSectionAsmOutput << "    mov rax, string" << dataLocation << "\n";
-                std::string constIdent = "<CONST_STRING" + std::to_string(dataLocation) + ">";
-                generator->push("rax", constIdent);
-                generator->m_consts.insert({ constIdent, Const { .dataLoc = dataLocation, .type = TokenType::str_lit, .valueLength = strLitTerm->str_lit.value.value().length() } });
+                generator->m_codeSectionAsmOutput << "    mov rax, string" << dataLoc << "\n";
+                generator->pushConst(
+                    "rax",
+                    generator->internalConstIdent(dataLoc, "STRING"),
+                    false,
+                    dataLoc,
+                    TokenType::str_lit,
+                    strLitTerm->str_lit.value.value().length()
+                );
+            }
+
+            void operator()(const BoolLitTermNode* boolLitTerm) const {
+                generator->m_codeSectionAsmOutput << "    mov rax, " << (boolLitTerm->bool_lit.value.value() == "true" ? 1 : 0) << "\n";
+                generator->pushVar(
+                    "rax",
+                    generator->internalVarIdent("BOOL"),
+                    false,
+                    TokenType::bool_lit
+                );
             }
 
             void operator()(const IdentTermNode* identTerm) const {
@@ -38,12 +53,12 @@ public:
                 if (isConst) {
                     const auto& cons = generator->m_consts.at(identName);
                     generator->m_codeSectionAsmOutput << "    mov rax, string" << cons.dataLoc << "\n";
-                    generator->push("rax", identName);
+                    generator->pushConst("rax", identName, true);
                 } else {
                     const auto& var = generator->m_vars.at(identName);
                     std::stringstream offset;
                     offset << "QWORD [rsp + " << (generator->m_stackSize - var.stackLoc - 1) * 8 << "]\n";
-                    generator->push(offset.str());
+                    generator->pushVar(offset.str(), identName, true);
                 }
             }
 
@@ -92,7 +107,7 @@ public:
                 generator->popWithConstNoStrLit("rbx");
 
                 generator->m_codeSectionAsmOutput << "    add rax, rbx\n";
-                generator->push("rax");
+                generator->pushInternalIntVar("rax");
             }
 
             void operator()(const SubBinExprNode* subBinExpr) const {
@@ -103,7 +118,7 @@ public:
                 generator->popWithConstNoStrLit("rax");
 
                 generator->m_codeSectionAsmOutput << "    sub rax, rbx \n";
-                generator->push("rax");
+                generator->pushInternalIntVar("rax");
             }
 
             void operator()(const MulBinExprNode* mulBinExpr) const {
@@ -114,7 +129,7 @@ public:
                 generator->popWithConstNoStrLit("rbx");
 
                 generator->m_codeSectionAsmOutput << "    imul rax, rbx\n";
-                generator->push("rax");
+                generator->pushInternalIntVar("rax");
             }
 
             void operator()(const DivBinExprNode* divBinExpr) const {
@@ -126,7 +141,7 @@ public:
                 generator->m_codeSectionAsmOutput << "    cqo\n";
 
                 generator->m_codeSectionAsmOutput << "    idiv rbx\n";
-                generator->push("rax");
+                generator->pushInternalIntVar("rax");
             }
         };
 
@@ -161,19 +176,35 @@ public:
 
                     generator->m_containsCustomExitCall = true;
                 } else if (builtInFuncStmt->funcName == "print") {
-                    bool isInt = true;
+                    bool isInt = true; // If nothing else can be determien, just assume int.
                     bool isConst = false;
-                    if (auto constName = generator->pop("rdi")) { // If not a const, rdi will hold the number as input for uitoa
-                        isConst = true;
-                        Const cons = generator->m_consts.at(constName.value());
-                        if (cons.type == TokenType::int_lit) {
-                            generator->m_codeSectionAsmOutput << "    mov rdi, [rdi]\n"; // Just move number into rdi as input for uitoa
-                        } else if (cons.type == TokenType::str_lit) {
-                            isInt = false;
-                            generator->m_codeSectionAsmOutput << "    mov rsi, rdi\n";
-                            generator->m_codeSectionAsmOutput << "    mov rdx, " << cons.valueLength << "\n";
+
+                    if (auto identNameAndIsConst = generator->pop("rdi")) {
+                        std::string identName = identNameAndIsConst.value().first;
+                        isConst = identNameAndIsConst.value().second;
+
+                        if (isConst) { // If not a const, rdi will hold the value directly
+                            Const cons = generator->m_consts.at(identName);
+                            if (cons.type == TokenType::int_lit) {
+                                generator->m_codeSectionAsmOutput << "    mov rdi, [rdi]\n"; // Just move number into rdi as input for uitoa
+                            } else if (cons.type == TokenType::str_lit) {
+                                isInt = false;
+                                generator->m_codeSectionAsmOutput << "    mov rsi, rdi\n";
+                                generator->m_codeSectionAsmOutput << "    mov rdx, " << cons.valueLength << "\n";
+                            } else if (cons.type == TokenType::bool_lit) {
+                                isInt = false;
+                                generator->m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
+                            } else {
+                                generator->failUnknownConstType();
+                            }
                         } else {
-                            generator->failUnknownConstType();
+                            Var var = generator->m_vars.at(identName);
+                            if (var.type == TokenType::bool_lit) {
+                                isInt = false;
+                                generator->m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
+                            } else if (var.type != TokenType::int_lit) { // If it's an int, the value is already in rdi
+                                generator->failUnknownVarType();
+                            }
                         }
                     }
 
@@ -194,19 +225,35 @@ public:
                         generator->m_codeSectionAsmOutput << "    add rsp, rdx\n";
                     }
                 } else if (builtInFuncStmt->funcName == "println") {
-                    bool isInt = true;
+                    bool isInt = true; // If nothing else can be determien, just assume int.
                     bool isConst = false;
-                    if (auto constName = generator->pop("rdi")) { // If not a const, rdi will hold the number as input for uitoa
-                        isConst = true;
-                        Const cons = generator->m_consts.at(constName.value());
-                        if (cons.type == TokenType::int_lit) {
-                            generator->m_codeSectionAsmOutput << "    mov rdi, [rdi]\n"; // Just move number into rdi as input for uitoa
-                        } else if (cons.type == TokenType::str_lit) {
-                            isInt = false;
-                            generator->m_codeSectionAsmOutput << "    mov rsi, rdi\n";
-                            generator->m_codeSectionAsmOutput << "    mov rdx, " << cons.valueLength << "\n";
+
+                    if (auto identNameAndIsConst = generator->pop("rdi")) {
+                        std::string identName = identNameAndIsConst.value().first;
+                        isConst = identNameAndIsConst.value().second;
+
+                        if (isConst) { // If not a const, rdi will hold the value directly
+                            Const cons = generator->m_consts.at(identName);
+                            if (cons.type == TokenType::int_lit) {
+                                generator->m_codeSectionAsmOutput << "    mov rdi, [rdi]\n"; // Just move number into rdi as input for uitoa
+                            } else if (cons.type == TokenType::str_lit) {
+                                isInt = false;
+                                generator->m_codeSectionAsmOutput << "    mov rsi, rdi\n";
+                                generator->m_codeSectionAsmOutput << "    mov rdx, " << cons.valueLength << "\n";
+                            } else if (cons.type == TokenType::bool_lit) {
+                                isInt = false;
+                                generator->m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
+                            } else {
+                                generator->failUnknownConstType();
+                            }
                         } else {
-                            generator->failUnknownConstType();
+                            Var var = generator->m_vars.at(identName);
+                            if (var.type == TokenType::bool_lit) {
+                                isInt = false;
+                                generator->m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
+                            } else if (var.type != TokenType::int_lit) { // If it's an int, the value is already in rdi
+                                generator->failUnknownVarType();
+                            }
                         }
                     }
 
@@ -265,21 +312,28 @@ public:
                 }
 
                 // TODO: Quite hacky, but oh well :D
-                TokenType litTermType = TokenType::int_lit;
-                size_t litTermValueLength = 0;
+                TokenType tokenType = {};
+                size_t valueLength = 0;
                 if (std::holds_alternative<TermNode*>(letStmt->expr->var)) {
                     auto term = std::get<TermNode*>(letStmt->expr->var);
 
                     if (std::holds_alternative<StrLitTermNode*>(term->var)) {
-                        litTermType = TokenType::str_lit;
-                        litTermValueLength = std::get<StrLitTermNode*>(term->var)->str_lit.value->length();
+                        tokenType = TokenType::str_lit;
+                        valueLength = std::get<StrLitTermNode*>(term->var)->str_lit.value->length();
+                    } else if (std::holds_alternative<BoolLitTermNode*>(term->var)) {
+                        tokenType = TokenType::bool_lit;
+                    } else if (std::holds_alternative<IntLitTermNode*>(term->var)) {
+                        tokenType = TokenType::int_lit;
                     }
+                } else if (std::holds_alternative<BinExprNode*>(letStmt->expr->var)) {
+                    // TODO: This assumes binary expressions are always performed on int_lit
+                    tokenType = TokenType::int_lit;
                 }
 
-                if (litTermType == TokenType::int_lit) {
-                    generator->m_vars.insert({ letStmt->ident.value.value(), Var { .stackLoc = generator->m_stackSize } });
+                if (tokenType == TokenType::str_lit) {
+                    generator->m_consts.insert({ letStmt->ident.value.value(), Const { .dataLoc = generator->m_dataSize, .type = tokenType, .valueLength = valueLength } });
                 } else {
-                    generator->m_consts.insert({ letStmt->ident.value.value(), Const { .dataLoc = generator->m_dataSize, .type = litTermType, .valueLength = litTermValueLength } });
+                    generator->m_vars.insert({ letStmt->ident.value.value(), Var { .stackLoc = generator->m_stackSize, .type = tokenType } });
                 }
 
                 generator->generateExpr(letStmt->expr);
@@ -292,8 +346,10 @@ public:
 
     [[nodiscard]] std::string generateProg() {
         m_dataSectionAsmOutput << "section .data\n";
-        m_codeSectionAsmOutput << "section .text\n";
+        m_dataSectionAsmOutput << "    STRING_TRUE db 'true', 0\n";
+        m_dataSectionAsmOutput << "    STRING_FALSE db 'false', 0\n";
 
+        m_codeSectionAsmOutput << "section .text\n";
         m_codeSectionAsmOutput << "global _start\n";
         m_codeSectionAsmOutput << "_start:\n";
 
@@ -309,6 +365,7 @@ public:
 
         addUnsignedIntToAsciiAsm();
         addCharacterCountAsm();
+        addMovBoolStrAsm();
         addSysWriteAsm();
 
         m_asmOutput << m_dataSectionAsmOutput.str() << "\n\n" << m_codeSectionAsmOutput.str();
@@ -317,36 +374,87 @@ public:
     }
 
 private:
-    void push(const std::string& reg, const std::string& constIdentName = "") {
-        if (constIdentName != "") {
-            m_constsOnStack.insert({ m_stackSize, constIdentName });
+    void pushVar(
+        const std::string& reg,
+        const std::string& identName = "",
+        const bool& alreadyExists = false,
+        const TokenType& type = {}
+    ) {
+        if (!alreadyExists) {
+            m_vars.insert({ identName, Var {.stackLoc = m_stackSize, .type = type}});
         }
+
+        m_varsOnStack.insert({ m_stackSize, identName });
 
         m_codeSectionAsmOutput << "    push " << reg << "\n";
         m_stackSize++;
     }
 
-    std::optional<std::string> pop(const std::string& reg) {
+    void pushInternalIntVar(const std::string& reg) {
+        pushVar(
+            reg,
+            internalVarIdent("INT"),
+            false,
+            TokenType::int_lit
+        );
+    }
+
+    void pushConst(
+        const std::string& reg,
+        const std::string& identName = "",
+        const bool& alreadyExists = false,
+        const size_t& dataLoc = 0,
+        const TokenType& type = {},
+        const size_t& valueLength = 0
+    ) {
+        if (!alreadyExists) {
+            m_consts.insert({ identName, Const { .dataLoc = dataLoc, .type = type, .valueLength = valueLength } });
+        }
+
+        m_constsOnStack.insert({ m_stackSize, identName });
+
+        m_codeSectionAsmOutput << "    push " << reg << "\n";
+        m_stackSize++;
+    }
+
+    std::optional<std::pair<std::string, bool>> pop(const std::string& reg) {
         m_codeSectionAsmOutput << "    pop " << reg << "\n";
         m_stackSize--;
 
         if (m_constsOnStack.contains(m_stackSize)) {
             std::string constName = m_constsOnStack.at(m_stackSize);
             m_constsOnStack.erase(m_stackSize);
-            return constName;
+            return std::make_pair(constName, true);
+        }
+
+        if (m_varsOnStack.contains(m_stackSize)) {
+            std::string varName = m_varsOnStack.at(m_stackSize);
+            m_varsOnStack.erase(m_stackSize);
+            return std::make_pair(varName, false);
         }
 
         return {};
     }
 
     void popWithConstNoStrLit(const std::string& reg) {
-        if (auto constName = pop(reg)) {
-            if (m_consts.at(constName.value()).type == TokenType::str_lit) {
-                failOperatorMissmatch();
-            }
+        if (auto identNameAndIsConst = pop(reg)) {
+            if (identNameAndIsConst.value().second) {
+                if (m_consts.at(identNameAndIsConst.value().first).type == TokenType::str_lit) {
+                    failOperatorMissmatch();
+                }
 
-            m_codeSectionAsmOutput << "    mov " << reg << ", [" << reg << "]\n";
+                m_codeSectionAsmOutput << "    mov " << reg << ", [" << reg << "]\n";
+            }
         }
+    }
+
+    std::string internalVarIdent(std::string additional = "") {
+        m_internalVarsCount++;
+        return "<VAR_" + additional + std::to_string(m_internalVarsCount) + ">";
+    }
+
+    std::string internalConstIdent(size_t dataLoc, std::string additional = "") {
+        return "<CONST_" + additional + std::to_string(dataLoc) + ">";
     }
 
     /*
@@ -401,6 +509,29 @@ private:
     }
 
     /*
+    * Input:
+    *     rdi -> an int that can be converted to bool [0 will be interpreted as false, everything else as true]
+    * Output:
+    *     rsi -> memory address of begin of correct string for given bool ("false" or "true")
+    *     rdx -> length of the string (5 for "false", 4 for "true")
+    * Clobbers rsi, rdx
+    */
+    void addMovBoolStrAsm() {
+        m_codeSectionAsmOutput << "movBoolStr:\n";
+
+        m_codeSectionAsmOutput << "    test rdi, rdi\n"; // If 0, it's "false"
+        m_codeSectionAsmOutput << "    jnz .mov_bool_str_not_false\n";
+        m_codeSectionAsmOutput << "        mov rsi, STRING_FALSE\n";
+        m_codeSectionAsmOutput << "        mov rdx, 5\n";
+        m_codeSectionAsmOutput << "        ret\n";
+        m_codeSectionAsmOutput << "    .mov_bool_str_not_false:\n";
+        m_codeSectionAsmOutput << "        mov rsi, STRING_TRUE\n";
+        m_codeSectionAsmOutput << "        mov rdx, 4\n";
+        m_codeSectionAsmOutput << "        ret\n";
+        m_codeSectionAsmOutput << "\n";
+    }
+
+    /*
     * Input as defined for sys_write sycall:
     *     rdi -> output file descriptor [1 - stdout, 2 - stderr]
     *     rsi -> pointer to first char
@@ -433,6 +564,10 @@ private:
         fail("Unknown built in function: " + funcName);
     }
 
+    void failUnknownVarType() const {
+        fail("Unknown var type");
+    }
+
     void failUnknownConstType() const {
         fail("Unknown const type");
     }
@@ -443,6 +578,7 @@ private:
 
     struct Var {
         size_t stackLoc;
+        TokenType type;
     };
 
     struct Const {
@@ -458,7 +594,9 @@ private:
     bool m_containsCustomExitCall = false;
     size_t m_stackSize = 0;
     size_t m_dataSize = 0;
-    std::unordered_map<std::string, Var> m_vars {};
-    std::unordered_map<std::string, Const> m_consts {};
-    std::unordered_map<size_t, std::string> m_constsOnStack = {};
+    size_t m_internalVarsCount = 0;
+    std::unordered_map<std::string, Var> m_vars {}; // var ident, var
+    std::unordered_map<size_t, std::string> m_varsOnStack {}; // stack loc, var ident
+    std::unordered_map<std::string, Const> m_consts {}; // const ident, const
+    std::unordered_map<size_t, std::string> m_constsOnStack = {}; // stack loc, const ident
 };

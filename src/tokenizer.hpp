@@ -5,9 +5,10 @@
 #include <vector>
 
 enum class TokenType {
-    let, ident, int_lit, str_lit, built_in_func,
+    unknown,
+    let, ident, int_lit, str_lit, bool_lit, built_in_func,
     eq, open_paren, close_paren, semi, quot,
-    plus, minus, star, slash,
+    plus, minus, star, slash
 };
 
 struct Token {
@@ -38,6 +39,8 @@ public:
 
                 if (buf == "let") {
                     tokens.push_back({ .type = TokenType::let });
+                } else if (buf == "true" || buf == "false") {
+                    tokens.push_back({ .type = TokenType::bool_lit, .value = buf });
                 } else if (auto builtInFuncToken = evaluateBuiltInFunc(buf)) {
                     tokens.push_back(builtInFuncToken.value());
                 } else {

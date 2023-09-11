@@ -17,6 +17,10 @@ struct StrLitTermNode {
     Token str_lit;
 };
 
+struct BoolLitTermNode {
+    Token bool_lit;
+};
+
 struct IdentTermNode {
     Token ident;
 };
@@ -26,7 +30,7 @@ struct ParenTermNode {
 };
 
 struct TermNode {
-    std::variant<IdentTermNode*, IntLitTermNode*, StrLitTermNode*, ParenTermNode*> var;
+    std::variant<IdentTermNode*, IntLitTermNode*, StrLitTermNode*, BoolLitTermNode*, ParenTermNode*> var;
 };
 
 struct SumBinExprNode {
@@ -113,6 +117,12 @@ public:
             // Closing quotation mark.
             consume();
 
+            return term;
+        } else if (peek().value().type == TokenType::bool_lit) {
+            auto boolLitTerm = m_allocator.alloc<BoolLitTermNode>();
+            boolLitTerm->bool_lit = consume();
+            auto term = m_allocator.alloc<TermNode>();
+            term->var = boolLitTerm;
             return term;
         } else if (peek().value().type == TokenType::ident) {
             auto identTerm = m_allocator.alloc<IdentTermNode>();
