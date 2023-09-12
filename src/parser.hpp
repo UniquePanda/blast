@@ -13,6 +13,10 @@ struct IntLitTermNode {
     Token int_lit;
 };
 
+struct DblLitTermNode {
+    Token dbl_lit;
+};
+
 struct StrLitTermNode {
     Token str_lit;
 };
@@ -30,7 +34,7 @@ struct ParenTermNode {
 };
 
 struct TermNode {
-    std::variant<IdentTermNode*, IntLitTermNode*, StrLitTermNode*, BoolLitTermNode*, ParenTermNode*> var;
+    std::variant<IdentTermNode*, IntLitTermNode*, DblLitTermNode*, StrLitTermNode*, BoolLitTermNode*, ParenTermNode*> var;
 };
 
 struct SumBinExprNode {
@@ -96,6 +100,12 @@ public:
             intLitTerm->int_lit = consume();
             auto term = m_allocator.alloc<TermNode>();
             term->var = intLitTerm;
+            return term;
+        } else if (peek().value().type == TokenType::dbl_lit) {
+            auto dblLitTerm = m_allocator.alloc<DblLitTermNode>();
+            dblLitTerm->dbl_lit = consume();
+            auto term = m_allocator.alloc<TermNode>();
+            term->var = dblLitTerm;
             return term;
         } else if (peek().value().type == TokenType::quot) {
             if (!peek(1).has_value() || peek(1).value().type != TokenType::str_lit) {
@@ -317,6 +327,8 @@ public:
                 failInvalidStmt();
             }
         }
+
+        std::cout << "  Parser used " << m_allocator.usedSizeInBytes() << " Bytes." << std::endl;
 
         return prog;
     }

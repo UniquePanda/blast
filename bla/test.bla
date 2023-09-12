@@ -5,7 +5,6 @@
 println("# Begin of test program...");
 
 println("# Performing number assignments...");
-let zz = 3;
 let a = 4 + 2 * 3; // 10
 let b = a * 2 - 2; // 18
 let c = 2 * b / 2 + 2; // 20
@@ -50,5 +49,48 @@ print(false);
 println(" # Printing bools directly with linebreak...");
 println(true);
 println(false);
+
+println("# Storing and printing a double (123.456)...");
+let i = 123.456;
+println(i);
+
+println("# Performing arithmethic operations on doubles (3.6, 1.7, 82.65, 305.76254555649)...");
+let j = 2.5 + 1.1;
+println(j);
+
+let k = 5.6 - 3.9;
+println(k);
+
+let l = 9.5 * 8.7;
+println(l);
+
+let m = 1090.655 / 3.567;
+println(m);
+
+println("# Performing arithmethic operations on doubles and ints (29.6, 152.3, 34867.8, 21.18)...");
+let n = 27.6 + 2;
+println(n);
+
+let o = 230 - 77.7;
+println(o);
+
+let p = 10566 * 3.3;
+println(p);
+
+println("# Performing more complex arithmethic operations on doubles and ints (91.5, 22.5, 24.4059906901)...");
+let q = (20.5 + 3) * 4 - 1 * 2.5;
+println(q);
+
+let r = 1 + 2 * 3 + 4.5;
+println(r);
+
+let s = (500 / 2) * (99 - 50.764) / (30.5 * (15 + 1.2));
+println(s);
+
+println("# Directly printing doubles and arithmethic operations on doubles (145.76, 45.8, 31.2, 33.3333)...");
+println(145.76);
+println(22.2 + 23.6);
+println(10.4 * 3);
+println(100.0 / 3);
 
 println("# Test program finished!");

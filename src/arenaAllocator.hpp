@@ -19,6 +19,10 @@ public:
         return static_cast<T*>(offset);
     }
 
+    const size_t usedSizeInBytes() {
+        return m_offset - m_buffer;
+    }
+
     ArenaAllocator(const ArenaAllocator& other) = delete;
 
     ArenaAllocator operator=(const ArenaAllocator& other) = delete;

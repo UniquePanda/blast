@@ -6,7 +6,7 @@
 
 enum class TokenType {
     unknown,
-    let, ident, int_lit, str_lit, bool_lit, built_in_func,
+    let, ident, int_lit, dbl_lit, str_lit, bool_lit, built_in_func,
     eq, open_paren, close_paren, semi, quot,
     plus, minus, star, slash
 };
@@ -55,7 +55,24 @@ public:
                     buf.push_back(consume());
                 }
 
-                tokens.push_back({.type = TokenType::int_lit, .value = buf});
+                if (!peek().has_value() || peek().value() != '.') {
+                    tokens.push_back({ .type = TokenType::int_lit, .value = buf });
+                    buf.clear();
+                    continue;
+                }
+
+                // The "."
+                buf.push_back(consume());
+
+                if (!peek().has_value() || !std::isdigit(peek().value())) {
+                    failUnxpectedNonDigit();
+                }
+
+                while (peek().has_value() && std::isdigit(peek().value())) {
+                    buf.push_back(consume());
+                }
+
+                tokens.push_back({ .type = TokenType::dbl_lit, .value = buf });
                 buf.clear();
             } else if (peek().value() == '"') {
                 tokens.push_back({.type = TokenType::quot});
@@ -186,6 +203,10 @@ private:
 
     void failUnknownChar(char unknownChar) const {
         fail("Unknown character: " + std::string(1, unknownChar));
+    }
+
+    void failUnxpectedNonDigit() const {
+        fail("Unexpected non-digit character");
     }
 
     const std::string m_source;
