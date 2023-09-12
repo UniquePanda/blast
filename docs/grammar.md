@@ -13,6 +13,7 @@ $$
             \text{SumBinExpr} \\
             \text{SubBinExpr} \\
             \text{MulBinExpr} \\
+            \text{DivBinExpr} \\
             \text{Term} \\
         \end{cases}
     \\
@@ -20,7 +21,7 @@ $$
         \begin{cases}
             \text{ident} \\
             \text{int\_lit} \\
-            "\text{str\_lit}" \\
+            \text{str\_lit} \\
             \text{bool\_lit} \\
             ([\text{Expr}]) \\
         \end{cases}
@@ -29,15 +30,18 @@ $$
         \begin{cases}
             [\text{Expr}] + [\text{Expr}] \\
             [\text{Expr}] + [\text{MulBinExpr}] \\
+            [\text{Expr}] + [\text{DivBinExpr}] \\
         \end{cases}
     \\
     [\text{SubBinExpr}] &\to
         \begin{cases}
             [\text{Expr}] - [\text{Expr}] \\
             [\text{Expr}] - [\text{MulBinExpr}] \\
+            [\text{Expr}] - [\text{DivBinExpr}] \\
         \end{cases}
     \\
     [\text{MulBinExpr}] &\to [\text{Expr}] * [\text{Expr}] \\
+    [\text{DivBinExpr}] &\to [\text{Expr}] / [\text{Expr}] \\
     [\text{BuiltInFunc}] &\to
         \begin{cases}
             \text{exit} & \text{Exit program with given exit code} \\
