@@ -275,56 +275,7 @@ public:
                     generator->m_codeSectionAsmOutput << "    syscall\n\n";
 
                     generator->m_containsCustomExitCall = true;
-                } else if (builtInFuncStmt->funcName == "print") {
-                    bool isInt = true; // If nothing else can be determined, just assume int.
-                    bool isConst = false;
-
-                    if (const auto popInfo = generator->pop("rdi")) {
-                        std::string identName = std::get<0>(popInfo.value());
-                        isConst = std::get<1>(popInfo.value());
-                        TokenType type = std::get<2>(popInfo.value());
-
-                        if (isConst) { // If a const, rdi will hold the address of the value
-                            if (type == TokenType::int_lit) {
-                                generator->m_codeSectionAsmOutput << "    mov rdi, [rdi]\n"; // Just move number into rdi as input for uitoa
-                            } else if (type == TokenType::str_lit) {
-                                isInt = false;
-                                generator->m_codeSectionAsmOutput << "    mov rsi, rdi\n";
-                                generator->m_codeSectionAsmOutput << "    mov rdx, " << generator->m_consts.at(identName).valueLength << "\n";
-                            } else if (type == TokenType::bool_lit) {
-                                isInt = false;
-                                generator->m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
-                            } else {
-                                generator->failUnknownConstType();
-                            }
-                        } else { // If not a const, rdi will hold the value directly
-                            if (type == TokenType::bool_lit) {
-                                isInt = false;
-                                generator->m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
-                            } else if (type != TokenType::int_lit) { // If it's an int, the value is already in rdi
-                                // Other types can't be vars
-                                generator->failUnknownVarType();
-                            }
-                        }
-                    }
-
-                    if (isInt) {
-                        generator->m_codeSectionAsmOutput << "    call uitoa\n"; // rsi points to first char, rdx has string length
-                        // Move the stack pointer so the next syscall won't override the string.
-                        generator->m_codeSectionAsmOutput << "    sub rsp, rdx\n";
-                        generator->m_codeSectionAsmOutput << "    sub rsp, 8\n";
-                    }
-
-                    // Perform the stdout write.
-                    generator->m_codeSectionAsmOutput << "    mov rdi, 1\n"; // file descriptor 1 (stdout) for sys_write syscall
-                    generator->m_codeSectionAsmOutput << "    call sysWrite\n";
-
-                    if (isInt) {
-                        // Reset stack pointer.
-                        generator->m_codeSectionAsmOutput << "    add rsp, 8\n";
-                        generator->m_codeSectionAsmOutput << "    add rsp, rdx\n";
-                    }
-                } else if (builtInFuncStmt->funcName == "println") {
+                } else if (builtInFuncStmt->funcName == "print" || builtInFuncStmt->funcName == "println") {
                     bool isInt = true; // If nothing else can be determined, just assume int.
                     bool isDouble = false;
                     bool isConst = false;
@@ -378,20 +329,22 @@ public:
                         generator->m_codeSectionAsmOutput << "    call udtoa\n"; // rsi points to first char, rdx has string length
                     }
 
-                    // Move rsi before the generated string, add a linebreak and move rsi back. As the string is read
-                    // from back to front, this will actually put the linebreak behind the last character.
-                    generator->m_codeSectionAsmOutput << "    add rsi, rdx\n";
+                    if (builtInFuncStmt->funcName == "println") {
+                        // Move rsi before the generated string, add a linebreak and move rsi back. As the string is read
+                        // from back to front, this will actually put the linebreak behind the last character.
+                        generator->m_codeSectionAsmOutput << "    add rsi, rdx\n";
 
-                    // If we are dealing with a constant, we potentially override important stuff if we add an additional
-                    // char. In this case, store the original value and restore it afterwards.
-                    // TODO: Probably dangerous? :D
-                    if (isConst) {
-                        generator->m_codeSectionAsmOutput << "    mov r8b, [rsi]\n";
+                        // If we are dealing with a constant, we potentially override important stuff if we add an additional
+                        // char. In this case, store the original value and restore it afterwards.
+                        // TODO: Probably dangerous? :D
+                        if (isConst) {
+                            generator->m_codeSectionAsmOutput << "    mov r8b, [rsi]\n";
+                        }
+
+                        generator->m_codeSectionAsmOutput << "    mov BYTE [rsi], 0xa\n";
+                        generator->m_codeSectionAsmOutput << "    sub rsi, rdx\n";
+                        generator->m_codeSectionAsmOutput << "    inc edx\n"; // increase number of chars to read by 1
                     }
-
-                    generator->m_codeSectionAsmOutput << "    mov BYTE [rsi], 0xa\n";
-                    generator->m_codeSectionAsmOutput << "    sub rsi, rdx\n";
-                    generator->m_codeSectionAsmOutput << "    inc edx\n"; // increase number of chars to read by 1
 
                     if (isInt || isDouble) {
                         // Move the stack pointer so the next syscall won't override the string.

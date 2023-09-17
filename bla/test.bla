@@ -93,4 +93,12 @@ println(22.2 + 23.6);
 println(10.4 * 3);
 println(100.0 / 3);
 
+println("Print some doubles without linebreak but space between them (5.7, 171.678, 9990.0004)...");
+print(1.3 + 4.4);
+print(" ");
+print(171.678);
+print(" ");
+print(9990.0004);
+
+println("");
 println("# Test program finished!");
