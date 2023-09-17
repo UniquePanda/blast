@@ -7,7 +7,7 @@
 enum class TokenType {
     unknown,
     let, ident, int_lit, dbl_lit, str_lit, bool_lit, built_in_func,
-    eq, open_paren, close_paren, semi, quot,
+    eq, open_paren, close_paren, open_curly, close_curly, semi, quot,
     plus, minus, star, slash
 };
 
@@ -121,9 +121,15 @@ public:
             } else if (peek().value() == '(') {
                 consume();
                 tokens.push_back({ .type = TokenType::open_paren });
-            }else if (peek().value() == ')') {
+            } else if (peek().value() == ')') {
                 consume();
                 tokens.push_back({ .type = TokenType::close_paren });
+            } else if (peek().value() == '{') {
+                consume();
+                tokens.push_back({ .type = TokenType::open_curly });
+            } else if (peek().value() == '}') {
+                consume();
+                tokens.push_back({ .type = TokenType::close_curly });
             } else if (peek().value() == ';') {
                 tokens.push_back({ .type = TokenType::semi });
                 consume();

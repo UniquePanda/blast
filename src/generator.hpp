@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <unordered_map>
+#include <map>
 
 #include "parser.hpp"
 
@@ -80,7 +81,7 @@ public:
                     const auto& var = generator->m_vars.at(identName);
                     std::stringstream offset;
                     const int typeSizeInQwords = var.type == TokenType::dbl_lit ? 2 : 1; // 1 QWord = 1 Stack line
-                    offset << "QWORD [rsp + " << (generator->m_stackSize - var.stackLoc - typeSizeInQwords) * 8 << "]\n";
+                    offset << "QWORD [rsp + " << (generator->m_stackSize - var.stackLoc - typeSizeInQwords) * 8 << "]";
                     generator->pushVar(offset.str(), identName, true);
                 }
             }
@@ -403,6 +404,7 @@ public:
                         generator->m_consts.insert({ letStmt->ident.value.value(), Const { .dataLoc = generator->m_dataSize, .type = tokenType, .valueLength = valueLength } });
                     } else {
                         generator->m_vars.insert({ letStmt->ident.value.value(), Var { .stackLoc = generator->m_stackSize, .type = tokenType } });
+                        generator->m_varsInOrder.push_back(letStmt->ident.value.value());
                     }
 
                     generator->generateExpr(letStmt->expr);
@@ -418,7 +420,18 @@ public:
                     }
 
                     generator->m_vars.insert({ letStmt->ident.value.value(), Var { .stackLoc = identStackLoc, .type = tokenType } });
+                    generator->m_varsInOrder.push_back(letStmt->ident.value.value());
                 }
+            }
+
+            void operator()(const ScopeNode* scopeStmt) const {
+                generator->beginScope();
+
+                for (const StmtNode* stmt : scopeStmt->stmts) {
+                    generator->generateStmt(stmt);
+                }
+
+                generator->endScope();
             }
         };
 
@@ -475,6 +488,7 @@ private:
 
         if (!alreadyExists) {
             m_vars.insert({ identName, Var {.stackLoc = m_stackSize, .type = type}});
+            m_varsInOrder.push_back(identName);
         }
 
         m_varsOnStack.insert({ m_stackSize, identName });
@@ -602,6 +616,33 @@ private:
 
     std::string internalConstIdent(size_t dataLoc, std::string additional = "") {
         return "<CONST_" + additional + std::to_string(dataLoc) + ">";
+    }
+
+    void beginScope() {
+        m_scopes.push_back(std::make_tuple(m_vars.size(), m_varsOnStack.size(), m_stackSize));
+    }
+
+    void endScope() {
+        auto scopeBeginInfo = m_scopes.back();
+        size_t scopeVarCount = m_vars.size() - std::get<0>(scopeBeginInfo);
+        size_t scopeVarsOnStackCount = m_varsOnStack.size() - std::get<1>(scopeBeginInfo);
+        size_t scopeStackSize = m_stackSize - std::get<2>(scopeBeginInfo);
+
+        for (int i = 0; i < scopeVarCount; i++) {
+            m_vars.erase(m_varsInOrder.back());
+            m_varsInOrder.pop_back();
+        }
+
+        auto varsOnStackIt = m_varsOnStack.end();
+        for (int i = 0; i < scopeVarsOnStackCount; i++) {
+            --varsOnStackIt;
+        }
+        m_varsOnStack.erase(varsOnStackIt, m_varsOnStack.end());
+
+        m_codeSectionAsmOutput << "    add rsp, " << scopeStackSize * 8 << "\n";
+        m_stackSize -= scopeStackSize;
+
+        m_scopes.pop_back();
     }
 
     /*
@@ -868,7 +909,9 @@ private:
     bool m_wasSecondLastPopDbl = false;
     std::vector<bool> m_werePushesDouble {};
     std::unordered_map<std::string, Var> m_vars {}; // var ident, var
-    std::unordered_map<size_t, std::string> m_varsOnStack {}; // stack loc, var ident
+    std::map<size_t, std::string> m_varsOnStack {}; // stack loc, var ident
+    std::vector<std::string> m_varsInOrder {};
     std::unordered_map<std::string, Const> m_consts {}; // const ident, const
     std::unordered_map<size_t, std::string> m_constsOnStack = {}; // stack loc, const ident
+    std::vector<std::tuple<size_t, size_t, size_t>> m_scopes = {}; // count vars, count varsOnStack, stackSize at scope start
 };

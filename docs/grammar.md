@@ -6,8 +6,10 @@ $$
         \begin{cases}
             \text{let}\space\text{ident} = \text{[Expr]}; \\
             \text{[BuiltInFunc]}(\text{[Expr]}); \\
+            \text{[Scope]} \\
         \end{cases}
     \\
+    [\text{Scope}] &\to [\text{Stmt}]^*\ \\
     [\text{Expr}] &\to
         \begin{cases}
             \text{SumBinExpr} \\

@@ -65,6 +65,8 @@ struct ExprNode {
     std::variant<TermNode*, BinExprNode*> var;
 };
 
+struct StmtNode;
+
 struct BuiltInFuncStmtNode {
     std::string funcName;
     ExprNode* expr;
@@ -75,8 +77,12 @@ struct LetStmtNode {
     ExprNode* expr;
 };
 
+struct ScopeNode {
+    std::vector<StmtNode*> stmts;
+};
+
 struct StmtNode {
-    std::variant<BuiltInFuncStmtNode*, LetStmtNode*> var;
+    std::variant<BuiltInFuncStmtNode*, LetStmtNode*, ScopeNode*> var;
 };
 
 struct ProgNode {
@@ -313,6 +319,34 @@ public:
             auto stmt = m_allocator.alloc<StmtNode>();
             stmt->var = letStmt;
             return stmt;
+        } else if (peek().value().type == TokenType::open_curly) {
+            if (!peek(1).has_value()) {
+                failUnexpectedEOF();
+            }
+
+            // {
+            consume();
+
+            auto scopeStmt = m_allocator.alloc<ScopeNode>();
+
+            while (auto stmt = parseStmt()) {
+                scopeStmt->stmts.push_back(stmt.value());
+            }
+
+            if (!peek().has_value()) {
+                failUnexpectedEOF();
+            }
+
+            if (peek().value().type != TokenType::close_curly) {
+                failMissingClosingCurly();
+            }
+
+            // }
+            consume();
+
+            auto stmt = m_allocator.alloc<StmtNode>();
+            stmt->var = scopeStmt;
+            return stmt;
         } else {
             return {};
         }
@@ -397,6 +431,10 @@ private:
 
     void failMissingClosingParen() const {
         fail("Missing closing parenthesis");
+    }
+
+    void failMissingClosingCurly() const {
+        fail("Missing closing curly brace");
     }
 
     void failMissingQuot() const {
