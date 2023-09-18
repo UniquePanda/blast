@@ -2,7 +2,7 @@
 * A program testing all the language features.
  * Like this multiline comment. :D
 */
-println("# Begin of test program...");
+println("# Begin of test program (\"--\" marks end of each test)...");
 println("");
 
 println("# Performing number assignments and printing number addition, should be 180...");
@@ -51,7 +51,7 @@ print(g);
 print(h);
 println("--");
 
-println(" # Printing bools directly without linebreak...");
+println("# Printing bools directly without linebreak...");
 print(true);
 print(false);
 println("--");
@@ -80,7 +80,7 @@ let m = 1090.655 / 3.567;
 println(m);
 println("--");
 
-println("# Performing arithmethic operations on doubles and ints (29.6, 152.3, 34867.8, 21.18)...");
+println("# Performing arithmethic operations on doubles and ints (29.6, 152.3, 34867.8, 6.25)...");
 let n = 27.6 + 2;
 println(n);
 
@@ -89,9 +89,12 @@ println(o);
 
 let p = 10566 * 3.3;
 println(p);
+
+let p2 = 12.5 / 2;
+println(p2);
 println("--");
 
-println("# Performing more complex arithmethic operations on doubles and ints (91.5, 22.5, 24.4059906901)...");
+println("# Performing more complex arithmethic operations on doubles and ints (91.5, 11.5, 24.4059906901)...");
 let q = (20.5 + 3) * 4 - 1 * 2.5;
 println(q);
 
@@ -130,6 +133,48 @@ println(3);
 let block2 = 5;
 println(block2);
 println(block1);
+println("--");
+
+println("# Testing if/ifelse/else statements (1, 2, 3, 4, 5, 6)...");
+let trueVal = true;
+let falseVal = false;
+let intTrueVal = 1;
+let intFalseVal = 0;
+let stringVal = "test";
+
+if (trueVal) {
+    println(1);
+} else {
+    println(0);
+}
+
+if (falseVal) {
+    println(10);
+} else if (trueVal) {
+    println(2);
+}
+
+if (falseVal) {
+    println(100);
+} elseif (trueVal) {
+    println(3);
+}
+
+if (intFalseVal) {
+    println(1000);
+} else {
+    println(4);
+}
+
+if (intFalseVal) {
+    println(1000);
+} else if (intTrueVal) {
+    println(5);
+}
+
+if (stringVal) {
+    println(6);
+}
 println("--");
 
 println("# Test program finished!");

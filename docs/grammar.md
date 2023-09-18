@@ -5,11 +5,14 @@ $$
     [\text{Stmt}] &\to
         \begin{cases}
             \text{let}\space\text{ident} = \text{[Expr]}; \\
-            \text{[BuiltInFunc]}(\text{[Expr]}); \\
+            \text{[BuiltInFunc]} \ \text{'('} \ \text{[Expr]} \ \text{')'}; \\
+            \text{if} \ \text{'('} \ \text{[Expr]} \ \text{')'} \ [\text{Scope}] \\
+            \quad (\text{elseif} \ \text{'('} \ \text{[Expr]} \ \text{')'} \ [\text{Scope}])^* \\
+            \quad (\text{else} \ [\text{Scope}])? \\
             \text{[Scope]} \\
         \end{cases}
     \\
-    [\text{Scope}] &\to [\text{Stmt}]^*\ \\
+    [\text{Scope}] &\to \{[\text{Stmt}]^*\}\ \\
     [\text{Expr}] &\to
         \begin{cases}
             \text{SumBinExpr} \\
@@ -26,7 +29,7 @@ $$
             \text{dbl\_lit} \\
             \text{str\_lit} \\
             \text{bool\_lit} \\
-            ([\text{Expr}]) \\
+            \text{'('} \ [\text{Expr}] \ \text{')'} \\
         \end{cases}
     \\
     [\text{SumBinExpr}] &\to

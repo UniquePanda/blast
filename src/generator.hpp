@@ -14,20 +14,20 @@ public:
 
     void generateTerm(const TermNode* term) {
         struct TermVisitor {
-            Generator* generator;
+            Generator& generator;
 
             void operator()(const IntLitTermNode* intLitTerm) const {
-                generator->m_codeSectionAsmOutput << "    mov rax, " << intLitTerm->int_lit.value.value() << "\n";
-                generator->pushInternalIntVar("rax");
+                generator.m_codeSectionAsmOutput << "    mov rax, " << intLitTerm->int_lit.value.value() << "\n";
+                generator.pushInternalIntVar("rax");
             }
 
             void operator()(const DblLitTermNode* dblLitTerm) const {
                 auto dataLoc = addDoubleToDataSection(std::stod(dblLitTerm->dbl_lit.value.value()));
 
-                generator->m_codeSectionAsmOutput << "    mov rax, dbl" << dataLoc << "\n";
-                generator->pushConst(
+                generator.m_codeSectionAsmOutput << "    mov rax, dbl" << dataLoc << "\n";
+                generator.pushConst(
                     "rax",
-                    generator->internalConstIdent(dataLoc, "DBL"),
+                    generator.internalConstIdent(dataLoc, "DBL"),
                     false,
                     dataLoc,
                     TokenType::dbl_lit,
@@ -38,10 +38,10 @@ public:
             void operator()(const StrLitTermNode* strLitTerm) const {
                 auto dataLoc = addStringToDataSection(strLitTerm->str_lit.value.value());
 
-                generator->m_codeSectionAsmOutput << "    mov rax, string" << dataLoc << "\n";
-                generator->pushConst(
+                generator.m_codeSectionAsmOutput << "    mov rax, string" << dataLoc << "\n";
+                generator.pushConst(
                     "rax",
-                    generator->internalConstIdent(dataLoc, "STRING"),
+                    generator.internalConstIdent(dataLoc, "STRING"),
                     false,
                     dataLoc,
                     TokenType::str_lit,
@@ -50,24 +50,19 @@ public:
             }
 
             void operator()(const BoolLitTermNode* boolLitTerm) const {
-                generator->m_codeSectionAsmOutput << "    mov rax, " << (boolLitTerm->bool_lit.value.value() == "true" ? 1 : 0) << "\n";
-                generator->pushVar(
-                    "rax",
-                    generator->internalVarIdent("BOOL"),
-                    false,
-                    TokenType::bool_lit
-                );
+                generator.m_codeSectionAsmOutput << "    mov rax, " << (boolLitTerm->bool_lit.value.value() == "true" ? 1 : 0) << "\n";
+                generator.pushInternalBoolVar("rax");
             }
 
             void operator()(const IdentTermNode* identTerm) const {
                 auto identName = identTerm->ident.value.value();
-                bool isConst = generator->m_consts.contains(identName);
-                if (!isConst && !generator->m_vars.contains(identName)) {
-                    generator->failUndeclaredIdentifer(identName);
+                bool isConst = generator.m_consts.contains(identName);
+                if (!isConst && !generator.m_vars.contains(identName)) {
+                    generator.failUndeclaredIdentifer(identName);
                 }
 
                 if (isConst) {
-                    const auto& cons = generator->m_consts.at(identName);
+                    const auto& cons = generator.m_consts.at(identName);
                     std::string typeIdent = "";
                     if (cons.type == TokenType::str_lit) {
                         typeIdent = "string";
@@ -75,19 +70,19 @@ public:
                         typeIdent = "dbl";
                     }
 
-                    generator->m_codeSectionAsmOutput << "    mov rax, " << typeIdent << cons.dataLoc << "\n";
-                    generator->pushConst("rax", identName, true);
+                    generator.m_codeSectionAsmOutput << "    mov rax, " << typeIdent << cons.dataLoc << "\n";
+                    generator.pushConst("rax", identName, true);
                 } else {
-                    const auto& var = generator->m_vars.at(identName);
+                    const auto& var = generator.m_vars.at(identName);
                     std::stringstream offset;
                     const int typeSizeInQwords = var.type == TokenType::dbl_lit ? 2 : 1; // 1 QWord = 1 Stack line
-                    offset << "QWORD [rsp + " << (generator->m_stackSize - var.stackLoc - typeSizeInQwords) * 8 << "]";
-                    generator->pushVar(offset.str(), identName, true);
+                    offset << "QWORD [rsp + " << (generator.m_stackSize - var.stackLoc - typeSizeInQwords) * 8 << "]";
+                    generator.pushVar(offset.str(), identName, true);
                 }
             }
 
             void operator()(const ParenTermNode* parenTerm) const {
-                generator->generateExpr(parenTerm->expr);
+                generator.generateExpr(parenTerm->expr);
             }
 
             size_t addStringToDataSection(std::string str) const {
@@ -100,157 +95,157 @@ public:
                 }
                 subStrings.push_back(str);
 
-                generator->m_dataSectionAsmOutput << "    string" << generator->m_dataSize << " db ";
+                generator.m_dataSectionAsmOutput << "    string" << generator.m_dataSize << " db ";
                 for (int i = 0; i < subStrings.size(); i++) {
-                    generator->m_dataSectionAsmOutput << "'" << subStrings.at(i) << "'";
+                    generator.m_dataSectionAsmOutput << "'" << subStrings.at(i) << "'";
 
                     if (i < subStrings.size() - 1) {
-                        generator->m_dataSectionAsmOutput << ", \"'\", ";
+                        generator.m_dataSectionAsmOutput << ", \"'\", ";
                     }
                 }
-                generator->m_dataSectionAsmOutput << ", 0\n";
-                generator->m_dataSize++;
+                generator.m_dataSectionAsmOutput << ", 0\n";
+                generator.m_dataSize++;
 
-                return generator->m_dataSize - 1;
+                return generator.m_dataSize - 1;
             }
 
             size_t addDoubleToDataSection(double dbl) const {
-                generator->m_dataSectionAsmOutput << "    dbl" << generator->m_dataSize << " dq "
+                generator.m_dataSectionAsmOutput << "    dbl" << generator.m_dataSize << " dq "
                     << std::setprecision(15) << std::fixed << dbl << "\n";
-                generator->m_dataSize++;
+                generator.m_dataSize++;
 
-                return generator->m_dataSize - 1;
+                return generator.m_dataSize - 1;
             }
         };
 
-        TermVisitor visitor({ .generator = this });
+        TermVisitor visitor({ .generator = *this });
         std::visit(visitor, term->var);
     }
 
     void generateExpr(const ExprNode* expr) {
         struct BinExprVisitor {
-            Generator* generator;
+            Generator& generator;
 
             void operator()(const SumBinExprNode* sumBinExpr) const {
-                generator->generateExpr(sumBinExpr->lhs);
-                generator->generateExpr(sumBinExpr->rhs);
+                generator.generateExpr(sumBinExpr->lhs);
+                generator.generateExpr(sumBinExpr->rhs);
 
-                generator->popWithConstNoStrLit("rax", "xmm0");
-                generator->popWithConstNoStrLit("rbx", "xmm1");
+                generator.popWithConstNoStrLit("rax", "xmm0");
+                generator.popWithConstNoStrLit("rbx", "xmm1");
 
-                if (!generator->m_wasSecondLastPopDbl && !generator->m_wasLastPopDbl) {
+                if (!generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int + Int
-                    generator->m_codeSectionAsmOutput << "    add rax, rbx\n";
-                    generator->pushInternalIntVar("rax");
-                } else if (generator->m_wasSecondLastPopDbl && !generator->m_wasLastPopDbl) {
+                    generator.m_codeSectionAsmOutput << "    add rax, rbx\n";
+                    generator.pushInternalIntVar("rax");
+                } else if (generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int + Dbl
-                    generator->m_codeSectionAsmOutput << "    cvtsi2sd xmm1, rbx\n";
-                    generator->m_codeSectionAsmOutput << "    addsd xmm0, xmm1\n";
-                    generator->pushInternalDblVar("xmm0");
-                } else if (!generator->m_wasSecondLastPopDbl && generator->m_wasLastPopDbl) {
+                    generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm1, rbx\n";
+                    generator.m_codeSectionAsmOutput << "    addsd xmm0, xmm1\n";
+                    generator.pushInternalDblVar("xmm0");
+                } else if (!generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl + Int
-                    generator->m_codeSectionAsmOutput << "    cvtsi2sd xmm0, rax\n";
-                    generator->m_codeSectionAsmOutput << "    addsd xmm0, xmm1\n";
-                    generator->pushInternalDblVar("xmm0");
-                } else if (generator->m_wasSecondLastPopDbl && generator->m_wasLastPopDbl) {
+                    generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm0, rax\n";
+                    generator.m_codeSectionAsmOutput << "    addsd xmm0, xmm1\n";
+                    generator.pushInternalDblVar("xmm0");
+                } else if (generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl + Dbl
-                    generator->m_codeSectionAsmOutput << "    addsd xmm0, xmm1\n";
-                    generator->pushInternalDblVar("xmm0");
+                    generator.m_codeSectionAsmOutput << "    addsd xmm0, xmm1\n";
+                    generator.pushInternalDblVar("xmm0");
                 }
             }
 
             void operator()(const SubBinExprNode* subBinExpr) const {
-                generator->generateExpr(subBinExpr->lhs);
-                generator->generateExpr(subBinExpr->rhs);
+                generator.generateExpr(subBinExpr->lhs);
+                generator.generateExpr(subBinExpr->rhs);
 
-                generator->popWithConstNoStrLit("rbx", "xmm1");
-                generator->popWithConstNoStrLit("rax", "xmm0");
+                generator.popWithConstNoStrLit("rbx", "xmm1");
+                generator.popWithConstNoStrLit("rax", "xmm0");
 
-                if (!generator->m_wasSecondLastPopDbl && !generator->m_wasLastPopDbl) {
+                if (!generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int - Int
-                    generator->m_codeSectionAsmOutput << "    sub rax, rbx\n";
-                    generator->pushInternalIntVar("rax");
-                } else if (generator->m_wasSecondLastPopDbl && !generator->m_wasLastPopDbl) {
+                    generator.m_codeSectionAsmOutput << "    sub rax, rbx\n";
+                    generator.pushInternalIntVar("rax");
+                } else if (generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int - Dbl
-                    generator->m_codeSectionAsmOutput << "    cvtsi2sd xmm0, rax\n";
-                    generator->m_codeSectionAsmOutput << "    subsd xmm0, xmm1\n";
-                    generator->pushInternalDblVar("xmm0");
-                } else if (!generator->m_wasSecondLastPopDbl && generator->m_wasLastPopDbl) {
+                    generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm0, rax\n";
+                    generator.m_codeSectionAsmOutput << "    subsd xmm0, xmm1\n";
+                    generator.pushInternalDblVar("xmm0");
+                } else if (!generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl - Int
-                    generator->m_codeSectionAsmOutput << "    cvtsi2sd xmm1, rbx\n";
-                    generator->m_codeSectionAsmOutput << "    subsd xmm0, xmm1\n";
-                    generator->pushInternalDblVar("xmm0");
-                } else if (generator->m_wasSecondLastPopDbl && generator->m_wasLastPopDbl) {
+                    generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm1, rbx\n";
+                    generator.m_codeSectionAsmOutput << "    subsd xmm0, xmm1\n";
+                    generator.pushInternalDblVar("xmm0");
+                } else if (generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl - Dbl
-                    generator->m_codeSectionAsmOutput << "    subsd xmm0, xmm1\n";
-                    generator->pushInternalDblVar("xmm0");
+                    generator.m_codeSectionAsmOutput << "    subsd xmm0, xmm1\n";
+                    generator.pushInternalDblVar("xmm0");
                 }
             }
 
             void operator()(const MulBinExprNode* mulBinExpr) const {
-                generator->generateExpr(mulBinExpr->lhs);
-                generator->generateExpr(mulBinExpr->rhs);
+                generator.generateExpr(mulBinExpr->lhs);
+                generator.generateExpr(mulBinExpr->rhs);
 
-                generator->popWithConstNoStrLit("rax", "xmm0");
-                generator->popWithConstNoStrLit("rbx", "xmm1");
+                generator.popWithConstNoStrLit("rax", "xmm0");
+                generator.popWithConstNoStrLit("rbx", "xmm1");
 
-                if (!generator->m_wasSecondLastPopDbl && !generator->m_wasLastPopDbl) {
+                if (!generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int * Int
-                    generator->m_codeSectionAsmOutput << "    imul rax, rbx\n";
-                    generator->pushInternalIntVar("rax");
-                } else if (generator->m_wasSecondLastPopDbl && !generator->m_wasLastPopDbl) {
+                    generator.m_codeSectionAsmOutput << "    imul rax, rbx\n";
+                    generator.pushInternalIntVar("rax");
+                } else if (generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int * Dbl
-                    generator->m_codeSectionAsmOutput << "    cvtsi2sd xmm1, rbx\n";
-                    generator->m_codeSectionAsmOutput << "    mulsd xmm0, xmm1\n";
-                    generator->pushInternalDblVar("xmm0");
-                } else if (!generator->m_wasSecondLastPopDbl && generator->m_wasLastPopDbl) {
+                    generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm1, rbx\n";
+                    generator.m_codeSectionAsmOutput << "    mulsd xmm0, xmm1\n";
+                    generator.pushInternalDblVar("xmm0");
+                } else if (!generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl * Int
-                    generator->m_codeSectionAsmOutput << "    cvtsi2sd xmm0, rax\n";
-                    generator->m_codeSectionAsmOutput << "    mulsd xmm0, xmm1\n";
-                    generator->pushInternalDblVar("xmm0");
-                } else if (generator->m_wasSecondLastPopDbl && generator->m_wasLastPopDbl) {
+                    generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm0, rax\n";
+                    generator.m_codeSectionAsmOutput << "    mulsd xmm0, xmm1\n";
+                    generator.pushInternalDblVar("xmm0");
+                } else if (generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl * Dbl
-                    generator->m_codeSectionAsmOutput << "    mulsd xmm0, xmm1\n";
-                    generator->pushInternalDblVar("xmm0");
+                    generator.m_codeSectionAsmOutput << "    mulsd xmm0, xmm1\n";
+                    generator.pushInternalDblVar("xmm0");
                 }
             }
 
             void operator()(const DivBinExprNode* divBinExpr) const {
-                generator->generateExpr(divBinExpr->lhs);
-                generator->generateExpr(divBinExpr->rhs);
+                generator.generateExpr(divBinExpr->lhs);
+                generator.generateExpr(divBinExpr->rhs);
 
-                generator->popWithConstNoStrLit("rbx", "xmm1"); // Divisor
-                generator->popWithConstNoStrLit("rax", "xmm0"); // Divident
+                generator.popWithConstNoStrLit("rbx", "xmm1"); // Divisor
+                generator.popWithConstNoStrLit("rax", "xmm0"); // Divident
                 
 
-                if (!generator->m_wasSecondLastPopDbl && !generator->m_wasLastPopDbl) {
+                if (!generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int / Int
-                    generator->m_codeSectionAsmOutput << "    cqo\n";
-                    generator->m_codeSectionAsmOutput << "    idiv rbx\n";
-                    generator->pushInternalIntVar("rax");
-                } else if (generator->m_wasSecondLastPopDbl && !generator->m_wasLastPopDbl) {
+                    generator.m_codeSectionAsmOutput << "    cqo\n";
+                    generator.m_codeSectionAsmOutput << "    idiv rbx\n";
+                    generator.pushInternalIntVar("rax");
+                } else if (generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int / Dbl
-                    generator->m_codeSectionAsmOutput << "    cvtsi2sd xmm0, rax\n";
-                    generator->m_codeSectionAsmOutput << "    DIVSD xmm0, xmm1\n";
-                    generator->pushInternalDblVar("xmm0");
-                } else if (!generator->m_wasSecondLastPopDbl && generator->m_wasLastPopDbl) {
+                    generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm0, rax\n";
+                    generator.m_codeSectionAsmOutput << "    DIVSD xmm0, xmm1\n";
+                    generator.pushInternalDblVar("xmm0");
+                } else if (!generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl / Int
-                    generator->m_codeSectionAsmOutput << "    cvtsi2sd xmm1, rbx\n";
-                    generator->m_codeSectionAsmOutput << "    DIVSD xmm0, xmm1\n";
-                    generator->pushInternalDblVar("xmm0");
-                } else if (generator->m_wasSecondLastPopDbl && generator->m_wasLastPopDbl) {
+                    generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm1, rbx\n";
+                    generator.m_codeSectionAsmOutput << "    DIVSD xmm0, xmm1\n";
+                    generator.pushInternalDblVar("xmm0");
+                } else if (generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl / Dbl
-                    generator->m_codeSectionAsmOutput << "    DIVSD xmm0, xmm1\n";
-                    generator->pushInternalDblVar("xmm0");
+                    generator.m_codeSectionAsmOutput << "    DIVSD xmm0, xmm1\n";
+                    generator.pushInternalDblVar("xmm0");
                 }
             }
         };
 
         struct ExprVisitor {
-            Generator* generator;
+            Generator& generator;
 
             void operator()(const TermNode* term) const {
-                generator->generateTerm(term);
+                generator.generateTerm(term);
             }
 
             void operator()(const BinExprNode* binExpr) const {
@@ -259,127 +254,137 @@ public:
             }
         };
 
-        ExprVisitor visitor({.generator = this});
+        ExprVisitor visitor({.generator = *this});
         std::visit(visitor, expr->var);
+    }
+
+    void generateScope(const ScopeNode* scope) {
+        beginScope();
+
+        for (const StmtNode* stmt : scope->stmts) {
+            generateStmt(stmt);
+        }
+
+        endScope();
     }
 
     void generateStmt(const StmtNode* stmt) {
         struct StmtVisitor {
-            Generator* generator;
+            Generator& generator;
 
             void operator()(const BuiltInFuncStmtNode* builtInFuncStmt) const {
-                generator->generateExpr(builtInFuncStmt->expr);
+                generator.generateExpr(builtInFuncStmt->expr);
 
                 if (builtInFuncStmt->funcName == "exit") {
-                    generator->m_codeSectionAsmOutput << "    mov rax, 60\n"; // sys_exit
-                    generator->popWithConstOnlyInt("rdi"); // exit code
-                    generator->m_codeSectionAsmOutput << "    syscall\n\n";
+                    generator.m_codeSectionAsmOutput << "    mov rax, 60\n"; // sys_exit
+                    generator.popWithConstOnlyInt("rdi"); // exit code
+                    generator.m_codeSectionAsmOutput << "    syscall\n\n";
 
-                    generator->m_containsCustomExitCall = true;
+                    generator.m_containsCustomExitCall = true;
                 } else if (builtInFuncStmt->funcName == "print" || builtInFuncStmt->funcName == "println") {
                     bool isInt = true; // If nothing else can be determined, just assume int.
                     bool isDouble = false;
                     bool isConst = false;
 
-                    if (generator->m_werePushesDouble.back()) {
-                        const auto popInfo = generator->pop("xmm0");
+                    if (generator.m_werePushesDouble.back()) {
+                        const auto popInfo = generator.pop("xmm0");
                         isInt = false;
                         isDouble = true;
-                        generator->m_codeSectionAsmOutput << "    xor rdi, rdi\n"; // Makes sure "udtoa" is reading double directly from xmm0
-                    } else if (const auto popInfo = generator->pop("rdi")) {
+                        generator.m_codeSectionAsmOutput << "    xor rdi, rdi\n"; // Makes sure "udtoa" is reading double directly from xmm0
+                    } else if (const auto popInfo = generator.pop("rdi")) {
                         std::string identName = std::get<0>(popInfo.value());
                         isConst = std::get<1>(popInfo.value());
                         TokenType type = std::get<2>(popInfo.value());
 
                         if (isConst) { // If not a const, rdi will hold the value directly
                             if (type == TokenType::int_lit) {
-                                generator->m_codeSectionAsmOutput << "    mov rdi, [rdi]\n"; // Just move number into rdi as input for uitoa
+                                generator.m_codeSectionAsmOutput << "    mov rdi, [rdi]\n"; // Just move number into rdi as input for uitoa
                             } else if (type == TokenType::dbl_lit) {
                                 isInt = false;
                                 isDouble = true;
                             } else if (type == TokenType::str_lit) {
                                 isInt = false;
-                                generator->m_codeSectionAsmOutput << "    mov rsi, rdi\n";
-                                generator->m_codeSectionAsmOutput << "    mov rdx, " << generator->m_consts.at(identName).valueLength << "\n";
+                                generator.m_codeSectionAsmOutput << "    mov rsi, rdi\n";
+                                generator.m_codeSectionAsmOutput << "    mov rdx, " << generator.m_consts.at(identName).valueLength << "\n";
                             } else if (type == TokenType::bool_lit) {
                                 isInt = false;
-                                generator->m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
+                                generator.m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
                             } else {
-                                generator->failUnknownConstType();
+                                generator.failUnknownConstType();
                             }
                         } else {
                             if (type == TokenType::bool_lit) {
                                 isInt = false;
-                                generator->m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
+                                generator.m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
                             } else if (type == TokenType::dbl_lit) { // rdi contains double
                                 isInt = false;
                                 isDouble = true;
-                                generator->m_codeSectionAsmOutput << "    mov [TEMP_DBL], rdi\n";
-                                generator->m_codeSectionAsmOutput << "    mov rdi, TEMP_DBL\n";
+                                generator.m_codeSectionAsmOutput << "    mov [TEMP_DBL], rdi\n";
+                                generator.m_codeSectionAsmOutput << "    mov rdi, TEMP_DBL\n";
                             } else if (type != TokenType::int_lit) { // If it's an int, the value is already in rdi
-                                generator->failUnknownVarType();
+                                generator.failUnknownVarType();
                             }
                         }
                     }
 
                     if (isInt) {
-                        generator->m_codeSectionAsmOutput << "    call uitoa\n"; // rsi points to first char, rdx has string length
+                        generator.m_codeSectionAsmOutput << "    call uitoa\n"; // rsi points to first char, rdx has string length
                     }
 
                     if (isDouble) {
-                        generator->m_codeSectionAsmOutput << "    call udtoa\n"; // rsi points to first char, rdx has string length
+                        generator.m_codeSectionAsmOutput << "    call udtoa\n"; // rsi points to first char, rdx has string length
                     }
 
                     if (builtInFuncStmt->funcName == "println") {
                         // Move rsi before the generated string, add a linebreak and move rsi back. As the string is read
                         // from back to front, this will actually put the linebreak behind the last character.
-                        generator->m_codeSectionAsmOutput << "    add rsi, rdx\n";
+                        generator.m_codeSectionAsmOutput << "    add rsi, rdx\n";
 
                         // If we are dealing with a constant, we potentially override important stuff if we add an additional
                         // char. In this case, store the original value and restore it afterwards.
                         // TODO: Probably dangerous? :D
                         if (isConst) {
-                            generator->m_codeSectionAsmOutput << "    mov r8b, [rsi]\n";
+                            generator.m_codeSectionAsmOutput << "    mov r8b, [rsi]\n";
                         }
 
-                        generator->m_codeSectionAsmOutput << "    mov BYTE [rsi], 0xa\n";
-                        generator->m_codeSectionAsmOutput << "    sub rsi, rdx\n";
-                        generator->m_codeSectionAsmOutput << "    inc edx\n"; // increase number of chars to read by 1
+                        generator.m_codeSectionAsmOutput << "    mov BYTE [rsi], 0xa\n";
+                        generator.m_codeSectionAsmOutput << "    sub rsi, rdx\n";
+                        generator.m_codeSectionAsmOutput << "    inc edx\n"; // increase number of chars to read by 1
                     }
 
                     if (isInt || isDouble) {
                         // Move the stack pointer so the next syscall won't override the string.
-                        generator->m_codeSectionAsmOutput << "    sub rsp, rdx\n";
-                        generator->m_codeSectionAsmOutput << "    sub rsp, 8\n";
+                        generator.m_codeSectionAsmOutput << "    sub rsp, rdx\n";
+                        generator.m_codeSectionAsmOutput << "    sub rsp, 8\n";
                     }
 
                     // Perform the stdout write.
-                    generator->m_codeSectionAsmOutput << "    mov rdi, 1\n"; // file descriptor 1 (stdout) for sys_write syscall
-                    generator->m_codeSectionAsmOutput << "    call sysWrite\n";
+                    generator.m_codeSectionAsmOutput << "    mov rdi, 1\n"; // file descriptor 1 (stdout) for sys_write syscall
+                    generator.m_codeSectionAsmOutput << "    call sysWrite\n";
 
                     if (isInt || isDouble) {
                         // Reset stack pointer.
-                        generator->m_codeSectionAsmOutput << "    add rsp, 8\n";
-                        generator->m_codeSectionAsmOutput << "    add rsp, rdx\n";
+                        generator.m_codeSectionAsmOutput << "    add rsp, 8\n";
+                        generator.m_codeSectionAsmOutput << "    add rsp, rdx\n";
                     }
 
                     if (isConst) {
                         // Restore value before our string
-                        generator->m_codeSectionAsmOutput << "    dec edx\n";
-                        generator->m_codeSectionAsmOutput << "    add rsi, rdx\n";
-                        generator->m_codeSectionAsmOutput << "    mov [rsi], r8b\n";
+                        generator.m_codeSectionAsmOutput << "    dec edx\n";
+                        generator.m_codeSectionAsmOutput << "    add rsi, rdx\n";
+                        generator.m_codeSectionAsmOutput << "    mov [rsi], r8b\n";
                     }
                 } else {
-                    generator->failUnknownBuiltInFunc(builtInFuncStmt->funcName);
+                    generator.failUnknownBuiltInFunc(builtInFuncStmt->funcName);
                 }
             }
 
             void operator()(const LetStmtNode* letStmt) const {
                 if (
-                    generator->m_vars.contains(letStmt->ident.value.value())
-                    || generator->m_consts.contains(letStmt->ident.value.value())
+                    generator.m_vars.contains(letStmt->ident.value.value())
+                    || generator.m_consts.contains(letStmt->ident.value.value())
                 ) {
-                    generator->failAlreadyUsedIdentifer(letStmt->ident.value.value());
+                    generator.failAlreadyUsedIdentifer(letStmt->ident.value.value());
                 }
 
                 // TODO: Quite hacky, but oh well :D
@@ -401,41 +406,107 @@ public:
                     }
 
                     if (tokenType == TokenType::str_lit || tokenType == TokenType::dbl_lit) {
-                        generator->m_consts.insert({ letStmt->ident.value.value(), Const { .dataLoc = generator->m_dataSize, .type = tokenType, .valueLength = valueLength } });
+                        generator.m_consts.insert({ letStmt->ident.value.value(), Const { .dataLoc = generator.m_dataSize, .type = tokenType, .valueLength = valueLength } });
                     } else {
-                        generator->m_vars.insert({ letStmt->ident.value.value(), Var { .stackLoc = generator->m_stackSize, .type = tokenType } });
-                        generator->m_varsInOrder.push_back(letStmt->ident.value.value());
+                        generator.m_vars.insert({ letStmt->ident.value.value(), Var { .stackLoc = generator.m_stackSize, .type = tokenType } });
+                        generator.m_varsInOrder.push_back(letStmt->ident.value.value());
                     }
 
-                    generator->generateExpr(letStmt->expr);
+                    generator.generateExpr(letStmt->expr);
                 } else if (std::holds_alternative<BinExprNode*>(letStmt->expr->var)) {
-                    const size_t identStackLoc = generator->m_stackSize;
+                    const size_t identStackLoc = generator.m_stackSize;
 
-                    generator->generateExpr(letStmt->expr);
+                    generator.generateExpr(letStmt->expr);
 
-                    if (generator->m_wasLastPopDbl || generator->m_wasSecondLastPopDbl) {
+                    if (generator.m_werePushesDouble.back()) {
                         tokenType = TokenType::dbl_lit;
                     } else {
                         tokenType = TokenType::int_lit;
                     }
 
-                    generator->m_vars.insert({ letStmt->ident.value.value(), Var { .stackLoc = identStackLoc, .type = tokenType } });
-                    generator->m_varsInOrder.push_back(letStmt->ident.value.value());
+                    generator.m_vars.insert({ letStmt->ident.value.value(), Var { .stackLoc = identStackLoc, .type = tokenType } });
+                    generator.m_varsInOrder.push_back(letStmt->ident.value.value());
                 }
             }
 
-            void operator()(const ScopeNode* scopeStmt) const {
-                generator->beginScope();
+            void operator()(const ScopeNode* scope) const {
+                generator.generateScope(scope);
+            }
 
-                for (const StmtNode* stmt : scopeStmt->stmts) {
-                    generator->generateStmt(stmt);
+            void operator()(const IfStmtNode* ifStmt) const {
+                generator.generateExpr(ifStmt->expr);
+
+                std::string label = generator.getLabelName();
+
+                if (generator.m_werePushesDouble.back()) {
+                    generator.pop("xmm0");
+                    generator.m_codeSectionAsmOutput << "    ptest xmm0, xmm0" << "\n";
+                    generator.m_codeSectionAsmOutput << "    jz " << label + "_setFalse" << "\n";
+                } else {
+                    generator.pop("rax");
+                    generator.m_codeSectionAsmOutput << "    test rax, rax" << "\n";
+                    generator.m_codeSectionAsmOutput << "    jz " << label + "_setFalse" << "\n";
                 }
 
-                generator->endScope();
+                generator.pushIfStmtBoolVar("1", label); // Mark this label as "true"
+                generator.generateScope(ifStmt->scope);
+                generator.m_codeSectionAsmOutput << "    jmp " << label << "\n";
+
+                generator.m_codeSectionAsmOutput << "    " << label + "_setFalse" << ":\n";
+                generator.pushIfStmtBoolVar("0", label, false); // Mark this label as "false"
+                generator.m_codeSectionAsmOutput << "    " << label << ":\n";
+            }
+
+            void operator()(const ElseIfStmtNode* elseIfStmt) const {
+                std::string label = generator.getLabelName();
+
+                // Last value on stack is always the push of the if or elseif statement result, because either nothing
+                // was done in the if statement (else executed directly) or a scope was done (stack was cleaned afterwards).
+                generator.pop("rax");
+                generator.m_codeSectionAsmOutput << "    test rax, rax" << "\n";
+                generator.m_codeSectionAsmOutput << "    jnz " << label + "_setTrue" << "\n";
+
+                generator.generateExpr(elseIfStmt->expr);
+
+                if (generator.m_werePushesDouble.back()) {
+                    generator.pop("xmm0");
+                    generator.m_codeSectionAsmOutput << "    ptest xmm0, xmm0" << "\n";
+                    generator.m_codeSectionAsmOutput << "    jz " << label + "_setFalse" << "\n";
+                } else {
+                    generator.pop("rax");
+                    generator.m_codeSectionAsmOutput << "    test rax, rax" << "\n";
+                    generator.m_codeSectionAsmOutput << "    jz " << label + "_setFalse" << "\n";
+                }
+
+                generator.pushIfStmtBoolVar("1", label); // Mark this label as "true"
+                generator.generateScope(elseIfStmt->scope);
+                generator.m_codeSectionAsmOutput << "    jmp " << label << "\n";
+
+                generator.m_codeSectionAsmOutput << "    " << label + "_setTrue" << ":\n";
+                generator.pushIfStmtBoolVar("1", label, false); // Mark this label as "true"
+                generator.m_codeSectionAsmOutput << "    jmp " << label << "\n";
+
+                generator.m_codeSectionAsmOutput << "    " << label + "_setFalse" << ":\n";
+                generator.pushIfStmtBoolVar("0", label, false); // Mark this label as "false"
+                generator.m_codeSectionAsmOutput << "    " << label << ":\n";
+            }
+
+            void operator()(const ElseStmtNode* elseStmt) const {
+                std::string label = generator.getLabelName();
+
+                // Last value on stack is always the push of the if or elseif statement result, because either nothing
+                // was done in the if statement (else executed directly) or a scope was done (stack was cleaned afterwards).
+                generator.pop("rax");
+                generator.m_codeSectionAsmOutput << "    test rax, rax" << "\n";
+                generator.m_codeSectionAsmOutput << "    jnz " << label << "\n";
+
+                generator.generateScope(elseStmt->scope);
+
+                generator.m_codeSectionAsmOutput << "    " << label << ":\n";
             }
         };
 
-        StmtVisitor visitor({.generator = this});
+        StmtVisitor visitor({ .generator = *this });
         std::visit(visitor, stmt->var);
     }
 
@@ -479,46 +550,71 @@ public:
 
 private:
     void pushVar(
-        const std::string& reg,
+        const std::string& regOrValue,
         const std::string& identName = "",
-        const bool& alreadyExists = false,
-        const TokenType& type = {}
+        const bool& doesAlreadyExists = false,
+        const TokenType& type = {},
+        const bool& shouldIncreaseStackSize = true
     ) {
         m_werePushesDouble.push_back(false);
 
-        if (!alreadyExists) {
+        if (!doesAlreadyExists && shouldIncreaseStackSize) {
             m_vars.insert({ identName, Var {.stackLoc = m_stackSize, .type = type}});
             m_varsInOrder.push_back(identName);
         }
 
-        m_varsOnStack.insert({ m_stackSize, identName });
+        if (shouldIncreaseStackSize) {
+            m_varsOnStack.insert({ m_stackSize, identName });
+        }
 
-        if (reg.starts_with("xmm")) {
+        if (regOrValue.starts_with("xmm")) {
             m_codeSectionAsmOutput << "    sub rsp, 16\n";
-            m_codeSectionAsmOutput << "    movdqu [rsp], " << reg << "\n";
-            m_stackSize += 2;
+            m_codeSectionAsmOutput << "    movdqu [rsp], " << regOrValue << "\n";
+            m_stackSize += shouldIncreaseStackSize ? 2 : 0;
             m_werePushesDouble.back() = true;
         } else {
-            m_codeSectionAsmOutput << "    push " << reg << "\n";
-            m_stackSize++;
+            m_codeSectionAsmOutput << "    push " << regOrValue << "\n";
+            m_stackSize += shouldIncreaseStackSize ? 1 : 0;
         }
     }
 
-    void pushInternalIntVar(const std::string& reg) {
+    void pushIfStmtBoolVar(const std::string& regOrValue, const std::string& label, const bool& shouldIncreaseStackSize = true) {
         pushVar(
-            reg,
-            internalVarIdent("INT"),
+            regOrValue,
+            "<VAR_BOOL_" + label + ">",
             false,
-            TokenType::int_lit
+            TokenType::bool_lit,
+            shouldIncreaseStackSize
         );
     }
 
-    void pushInternalDblVar(const std::string& reg) {
+    void pushInternalIntVar(const std::string& regOrValue, const bool& shouldIncreaseStackSize = true) {
         pushVar(
-            reg,
+            regOrValue,
+            internalVarIdent("INT"),
+            false,
+            TokenType::int_lit,
+            shouldIncreaseStackSize
+        );
+    }
+
+    void pushInternalBoolVar(const std::string& regOrValue, const bool& shouldIncreaseStackSize = true) {
+        pushVar(
+            regOrValue,
+            internalVarIdent("BOOL"),
+            false,
+            TokenType::bool_lit,
+            shouldIncreaseStackSize
+        );
+    }
+
+    void pushInternalDblVar(const std::string& regOrValue, const bool& shouldIncreaseStackSize = true) {
+        pushVar(
+            regOrValue,
             internalVarIdent("DBL"),
             false,
-            TokenType::dbl_lit
+            TokenType::dbl_lit,
+            shouldIncreaseStackSize
         );
     }
 
@@ -643,6 +739,10 @@ private:
         m_stackSize -= scopeStackSize;
 
         m_scopes.pop_back();
+    }
+
+    std::string getLabelName() {
+        return ".label" + std::to_string(m_labelCount++);
     }
 
     /*
@@ -905,6 +1005,7 @@ private:
     size_t m_stackSize = 0;
     size_t m_dataSize = 0;
     size_t m_internalVarsCount = 0;
+    size_t m_labelCount = 0;
     bool m_wasLastPopDbl = false;
     bool m_wasSecondLastPopDbl = false;
     std::vector<bool> m_werePushesDouble {};

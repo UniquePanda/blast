@@ -81,8 +81,22 @@ struct ScopeNode {
     std::vector<StmtNode*> stmts;
 };
 
+struct IfStmtNode {
+    ExprNode* expr;
+    ScopeNode* scope;
+};
+
+struct ElseIfStmtNode {
+    ExprNode* expr;
+    ScopeNode* scope;
+};
+
+struct ElseStmtNode {
+    ScopeNode* scope;
+};
+
 struct StmtNode {
-    std::variant<BuiltInFuncStmtNode*, LetStmtNode*, ScopeNode*> var;
+    std::variant<BuiltInFuncStmtNode*, LetStmtNode*, ScopeNode*, IfStmtNode*, ElseIfStmtNode*, ElseStmtNode*> var;
 };
 
 struct ProgNode {
@@ -97,7 +111,9 @@ public:
         {}
 
     std::optional<TermNode*> parseTerm() {
-         if (!peek().has_value()) {
+        m_lastStmt = {};
+
+        if (!peek().has_value()) {
             return {};
         }
 
@@ -173,6 +189,8 @@ public:
     }
 
     template <typename T> T* parseSpecificBinExpr(ExprNode *lhsExpr, size_t precedence) {
+        m_lastStmt = {};
+
         auto specificBinExpr = m_allocator.alloc<T>();
         specificBinExpr->lhs = lhsExpr;
 
@@ -187,6 +205,8 @@ public:
     }
 
     std::optional<BinExprNode*> parseBinExpr(TokenType tokenType, ExprNode *lhsExpr, size_t precedence) {
+        m_lastStmt = {};
+
         consume();
         auto binExpr = m_allocator.alloc<BinExprNode>();
 
@@ -211,6 +231,8 @@ public:
     }
 
     std::optional<ExprNode*> parseExpr(size_t precedence = 0) {
+        m_lastStmt = {};
+
         if (!peek().has_value()) {
             return {};
         }
@@ -240,6 +262,43 @@ public:
         }
 
         return {};
+    }
+
+    std::optional<ScopeNode*> parseScope() {
+        // Don't set m_lastStmt here, because scopes are often used between other statements which might depend on each other.
+        if (!peek().has_value()) {
+            return {};
+        }
+
+        if (peek().value().type != TokenType::open_curly) {
+            failMissingOpenCurly();
+        }
+
+        if (!peek(1).has_value()) {
+            failUnexpectedEOF();
+        }
+
+        // Open curly
+        consume();
+
+        auto scopeStmt = m_allocator.alloc<ScopeNode>();
+
+        while (auto stmt = parseStmt()) {
+            scopeStmt->stmts.push_back(stmt.value());
+        }
+
+        if (!peek().has_value()) {
+            failUnexpectedEOF();
+        }
+
+        if (peek().value().type != TokenType::close_curly) {
+            failMissingClosingCurly();
+        }
+
+        // Closing curly
+        consume();
+
+        return scopeStmt;
     }
 
     std::optional<StmtNode*> parseStmt() {
@@ -282,6 +341,8 @@ public:
                 exit(EXIT_FAILURE);
             }
 
+            m_lastStmt = TokenType::built_in_func;
+
             auto stmt = m_allocator.alloc<StmtNode>();
             stmt->var = builtInFuncStmt;
             return stmt;
@@ -316,40 +377,132 @@ public:
 
             consumeSemi();
 
+            m_lastStmt = TokenType::let;
+
             auto stmt = m_allocator.alloc<StmtNode>();
             stmt->var = letStmt;
             return stmt;
         } else if (peek().value().type == TokenType::open_curly) {
+            // Don't set m_lastStmt here, because scopes are often used between other statements which might depend on each other.
+            if (auto scopeStmt = parseScope()) {
+                auto stmt = m_allocator.alloc<StmtNode>();
+                stmt->var = scopeStmt.value();
+                return stmt;
+            } else {
+                failInvalidScope();
+            }
+        } else if (peek().value().type == TokenType::if_) {
             if (!peek(1).has_value()) {
                 failUnexpectedEOF();
             }
 
-            // {
-            consume();
-
-            auto scopeStmt = m_allocator.alloc<ScopeNode>();
-
-            while (auto stmt = parseStmt()) {
-                scopeStmt->stmts.push_back(stmt.value());
+            if (peek(1).value().type != TokenType::open_paren) {
+                failMissingOpenParen();
             }
 
-            if (!peek().has_value()) {
+            // if and open parenthesis
+            consume();
+            consume();
+
+            auto ifStmt = m_allocator.alloc<IfStmtNode>();
+
+            if (auto expr = parseExpr()) {
+                ifStmt->expr = expr.value();
+            } else {
+                failMissingExpr();
+            }
+
+            if (peek().value().type != TokenType::close_paren) {
+                failMissingClosingParen();
+            }
+
+            // Closing parenthesis
+            consume();
+
+            if (auto scopeStmt = parseScope()) {
+                ifStmt->scope = scopeStmt.value();
+            } else {
+                failInvalidScope();
+            }
+
+            m_lastStmt = TokenType::if_;
+
+            auto stmt = m_allocator.alloc<StmtNode>();
+            stmt->var = ifStmt;
+            return stmt;
+        } else if (peek().value().type == TokenType::elseif) {
+            if (m_lastStmt != TokenType::if_ && m_lastStmt != TokenType::elseif) {
+                failMissingStmt("if");
+            }
+
+            if (!peek(1).has_value()) {
                 failUnexpectedEOF();
             }
 
-            if (peek().value().type != TokenType::close_curly) {
-                failMissingClosingCurly();
+            if (peek(1).value().type != TokenType::open_paren) {
+                failMissingOpenParen();
             }
 
-            // }
+            // elseif and open parenthesis
+            consume();
             consume();
 
+            auto elseIfStmt = m_allocator.alloc<ElseIfStmtNode>();
+
+            if (auto expr = parseExpr()) {
+                elseIfStmt->expr = expr.value();
+            } else {
+                failMissingExpr();
+            }
+
+            if (peek().value().type != TokenType::close_paren) {
+                failMissingClosingParen();
+            }
+
+            // Closing parenthesis
+            consume();
+
+            if (auto scopeStmt = parseScope()) {
+                elseIfStmt->scope = scopeStmt.value();
+            } else {
+                failInvalidScope();
+            }
+
+            m_lastStmt = TokenType::elseif;
+
             auto stmt = m_allocator.alloc<StmtNode>();
-            stmt->var = scopeStmt;
+            stmt->var = elseIfStmt;
+            return stmt;
+        } else if (peek().value().type == TokenType::else_) {
+            if (m_lastStmt != TokenType::if_ && m_lastStmt != TokenType::elseif) {
+                failMissingStmt("if");
+            }
+
+            if (!peek(1).has_value()) {
+                failUnexpectedEOF();
+            }
+
+            // else
+            consume();
+
+            auto elseStmt = m_allocator.alloc<ElseStmtNode>();
+
+            if (auto scopeStmt = parseScope()) {
+                elseStmt->scope = scopeStmt.value();
+            } else {
+                failInvalidScope();
+            }
+
+            m_lastStmt = TokenType::else_;
+
+            auto stmt = m_allocator.alloc<StmtNode>();
+            stmt->var = elseStmt;
             return stmt;
         } else {
             return {};
         }
+
+        return {};
     }
 
     std::optional<ProgNode> parseProg() {
@@ -362,7 +515,7 @@ public:
             }
         }
 
-        std::cout << "  Parser used " << m_allocator.usedSizeInBytes() << " Bytes." << std::endl;
+        std::cout << "      ## Parser used " << m_allocator.usedSizeInBytes() << " Bytes." << std::endl;
 
         return prog;
     }
@@ -401,6 +554,10 @@ private:
         fail("Invalid statement");
     }
 
+    void failInvalidScope() const {
+        fail("Invalid scope");
+    }
+
     void failInvalidExpr() const {
         fail("Invalid expression");
     }
@@ -415,6 +572,10 @@ private:
 
     void failMissingOperator() const {
         fail("Missing operator");
+    }
+
+    void failMissingStmt(std::string stmtName = "") const {
+        fail("Missing statement" + (stmtName == "" ? "" : ": " + stmtName));
     }
 
     void failUnsupportedBinaryOperator() const {
@@ -433,6 +594,10 @@ private:
         fail("Missing closing parenthesis");
     }
 
+    void failMissingOpenCurly() const {
+        fail("Missing opening curly brace");
+    }
+
     void failMissingClosingCurly() const {
         fail("Missing closing curly brace");
     }
@@ -447,5 +612,6 @@ private:
 
     const std::vector<Token> m_tokens;
     size_t m_index = 0;
+    TokenType m_lastStmt = {};
     ArenaAllocator m_allocator;
 };

@@ -6,7 +6,8 @@
 
 enum class TokenType {
     unknown,
-    let, ident, int_lit, dbl_lit, str_lit, bool_lit, built_in_func,
+    let, ident, int_lit, dbl_lit, str_lit, bool_lit,
+    built_in_func, if_, elseif, else_,
     eq, open_paren, close_paren, open_curly, close_curly, semi, quot,
     plus, minus, star, slash
 };
@@ -39,6 +40,23 @@ public:
 
                 if (buf == "let") {
                     tokens.push_back({ .type = TokenType::let });
+                } else if (buf == "if") {
+                    tokens.push_back({ .type = TokenType::if_ });
+                } else if (buf == "else") {
+                    if (
+                        peek().has_value() && peek().value() == ' '
+                        && peek(1).has_value() && peek(1).value() == 'i'
+                        && peek(2).has_value() && peek(2).value() == 'f'
+                    ) {
+                        consume();
+                        consume();
+                        consume();
+                        tokens.push_back({ .type = TokenType::elseif });
+                    } else {
+                        tokens.push_back({ .type = TokenType::else_ });
+                    }
+                } else if (buf == "elseif") {
+                    tokens.push_back({ .type = TokenType::elseif });
                 } else if (buf == "true" || buf == "false") {
                     tokens.push_back({ .type = TokenType::bool_lit, .value = buf });
                 } else if (auto builtInFuncToken = evaluateBuiltInFunc(buf)) {
