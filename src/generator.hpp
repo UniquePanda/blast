@@ -290,7 +290,7 @@ public:
                         const auto popInfo = generator.pop("xmm0");
                         isInt = false;
                         isDouble = true;
-                        generator.m_codeSectionAsmOutput << "    xor rdi, rdi\n"; // Makes sure "udtoa" is reading double directly from xmm0
+                        generator.m_codeSectionAsmOutput << "    xor rdi, rdi\n"; // Makes sure "dtoa" is reading double directly from xmm0
                     } else if (const auto popInfo = generator.pop("rdi")) {
                         std::string identName = std::get<0>(popInfo.value());
                         isConst = std::get<1>(popInfo.value());
@@ -298,7 +298,7 @@ public:
 
                         if (isConst) { // If not a const, rdi will hold the value directly
                             if (type == TokenType::int_lit) {
-                                generator.m_codeSectionAsmOutput << "    mov rdi, [rdi]\n"; // Just move number into rdi as input for uitoa
+                                generator.m_codeSectionAsmOutput << "    mov rdi, [rdi]\n"; // Just move number into rdi as input for itoa
                             } else if (type == TokenType::dbl_lit) {
                                 isInt = false;
                                 isDouble = true;
@@ -328,11 +328,11 @@ public:
                     }
 
                     if (isInt) {
-                        generator.m_codeSectionAsmOutput << "    call uitoa\n"; // rsi points to first char, rdx has string length
+                        generator.m_codeSectionAsmOutput << "    call itoa\n"; // rsi points to first char, rdx has string length
                     }
 
                     if (isDouble) {
-                        generator.m_codeSectionAsmOutput << "    call udtoa\n"; // rsi points to first char, rdx has string length
+                        generator.m_codeSectionAsmOutput << "    call dtoa\n"; // rsi points to first char, rdx has string length
                     }
 
                     if (builtInFuncStmt->funcName == "println") {
@@ -518,6 +518,7 @@ public:
         m_dataSectionAsmOutput << "section .data\n";
         m_dataSectionAsmOutput << "    STRING_TRUE db 'true', 0\n";
         m_dataSectionAsmOutput << "    STRING_FALSE db 'false', 0\n";
+        m_dataSectionAsmOutput << "    FLIP_S_64B dq 0x8000000000000000\n";
         m_dataSectionAsmOutput << "    MUL_FRAC_TO_INT dq 1000000000000000.0\n";
         m_dataSectionAsmOutput << "    DBL_0_1 dq 0.1\n";
         m_dataSectionAsmOutput << "    DBL_1_0 dq 1.0\n";
@@ -537,7 +538,7 @@ public:
             m_codeSectionAsmOutput << "    syscall\n\n";
         }
 
-        addUnsignedIntToAsciiAsm();
+        addIntToAsciiAsm();
         addUnsignedDoubleToAsciiAsm();
         addCharacterCountAsm();
         addMovBoolStrAsm();
@@ -753,30 +754,44 @@ private:
     *     rdx (contains number of chars)
     * Clobbers rsi, rax, rcx, rdx
     */
-    void addUnsignedIntToAsciiAsm() {
+    void addIntToAsciiAsm() {
         // reference: https://stackoverflow.com/a/46301894
-        m_codeSectionAsmOutput << "uitoa:\n";
+        m_codeSectionAsmOutput << "itoa:\n";
 
         m_codeSectionAsmOutput << "    mov rax, rdi\n"; // Expects int to convert to be in edi
         m_codeSectionAsmOutput << "    mov ecx, 0xa\n"; // Store 10 as base
         m_codeSectionAsmOutput << "    mov rsi, rsp\n"; // Stack pointer to rsi
 
+        // Negate value if it is negative to make sure we print the correct number
+        m_codeSectionAsmOutput << "    test rax, rax\n";
+        m_codeSectionAsmOutput << "    jns .itoaNotNegative\n";
+        m_codeSectionAsmOutput << "    neg rax\n";
+        m_codeSectionAsmOutput << "    .itoaNotNegative:\n";
+
         m_codeSectionAsmOutput << "\n";
-        m_codeSectionAsmOutput << "    .uitoaDigitToAsciiLoop:\n";
+        m_codeSectionAsmOutput << "    .itoaDigitToAsciiLoop:\n";
         m_codeSectionAsmOutput << "        xor edx, edx\n";
         m_codeSectionAsmOutput << "        div rcx\n"; // divide eax by 10, remainder in edx
         m_codeSectionAsmOutput << "        add edx, '0'\n"; // Convert remainder to ascii (adding ascii value of 0)
         m_codeSectionAsmOutput << "        dec rsi\n"; // move stack pointer down
         m_codeSectionAsmOutput << "        mov [rsi], dl\n"; // add lowest byte from edx (ascii value of remainder) to stack
         m_codeSectionAsmOutput << "        test rax, rax\n"; // ZeroFlag set to 1 if eax is 0
-        m_codeSectionAsmOutput << "        jnz .uitoaDigitToAsciiLoop\n"; // process next digit if still number (non-zero) in eax
+        m_codeSectionAsmOutput << "        jnz .itoaDigitToAsciiLoop\n"; // process next digit if still number (non-zero) in eax
         m_codeSectionAsmOutput << "\n";
+
+        // Add "-" char if needed
+        m_codeSectionAsmOutput << "    test rdi, rdi\n"; // Test to get SF (sign flag) (rdi still holds original value)
+        m_codeSectionAsmOutput << "    jns .itoaNoNegativeSign\n"; // jmp if no sign
+        m_codeSectionAsmOutput << "    dec rsi\n"; // move stack pointer down
+        m_codeSectionAsmOutput << "    mov BYTE [rsi], '-'\n";
+        m_codeSectionAsmOutput << "    .itoaNoNegativeSign:\n";
+
         m_codeSectionAsmOutput << "    lea edx, [rsp]\n"; // address of rsp to edx
         m_codeSectionAsmOutput << "    sub edx, esi\n"; // subtract address in esi from edx to get length between last and first char
         m_codeSectionAsmOutput << "    ret\n";
         m_codeSectionAsmOutput << "\n";
 
-        // rsi now points to first digit (in ascii) in memory, other digits are stored above in memory
+        // rsi now points to first digit/negative sign (in ascii) in memory, other digits are stored above in memory
         // rdx now contains the number of chars that were stored in memory
     }
 
@@ -787,17 +802,27 @@ private:
     * Output:
     *     rsi (points to first char)
     *     rdx (contains number of chars)
-    * Clobbers rsi, rax, rbx, rcx, rdx, xmm0, xmm1
+    * Clobbers rsi, rax, rbx, rcx, rdx, r8, xmm0, xmm1, xmm2
     */
     void addUnsignedDoubleToAsciiAsm() {
         // reference: https://stackoverflow.com/a/46301894
-        m_codeSectionAsmOutput << "udtoa:\n";
+        m_codeSectionAsmOutput << "dtoa:\n";
 
         // Extract only whole number part into xmm1
         m_codeSectionAsmOutput << "    test rdi, rdi\n"; // Expects double to already be in xmm0 if rdi is 0
-        m_codeSectionAsmOutput << "    jz .udtoaDoubleAlreadyLoaded\n"; // Expects double to already be in xmm0 if rdi is 0
+        m_codeSectionAsmOutput << "    jz .dtoaDoubleAlreadyLoaded\n"; // Expects double to already be in xmm0 if rdi is 0
         m_codeSectionAsmOutput << "    movups xmm0, [rdi]\n"; // Expects address of double to convert to be in rdi
-        m_codeSectionAsmOutput << "    .udtoaDoubleAlreadyLoaded:\n";
+        m_codeSectionAsmOutput << "    .dtoaDoubleAlreadyLoaded:\n";
+
+        // Negate value if it is negative to make sure we print the correct number
+        m_codeSectionAsmOutput << "    xor r8, r8\n";
+        m_codeSectionAsmOutput << "    movmskpd r8, xmm0\n"; // Extract sign bits into r8
+        m_codeSectionAsmOutput << "    test r8, r8\n"; // If r8 is not 0 then number in xmm0 is negative
+        m_codeSectionAsmOutput << "    jz .dtoaNotNegative\n";
+        m_codeSectionAsmOutput << "    movq xmm1, [FLIP_S_64B]\n";
+        m_codeSectionAsmOutput << "    xorps xmm0, xmm1\n";
+        m_codeSectionAsmOutput << "    .dtoaNotNegative:\n";
+
         m_codeSectionAsmOutput << "    cvttsd2si rdi, xmm0\n"; // Whole number (before decimal point) to int in rdi
 
         // Extract fractional part and add 0.1 to keep leading 0 when converting to int
@@ -809,12 +834,12 @@ private:
 
         // Initialize bl to determine if fractional part started with 9. Then the number now is equal to/bigger than one, which needs to be taken into account later.
         m_codeSectionAsmOutput << "    xor bl, bl\n"; // Clean bl
-        m_codeSectionAsmOutput << "    mov r8, DBL_1_0\n";
-        m_codeSectionAsmOutput << "    movups xmm2, [r8]\n";
+        m_codeSectionAsmOutput << "    mov rcx, DBL_1_0\n";
+        m_codeSectionAsmOutput << "    movups xmm2, [rcx]\n";
         m_codeSectionAsmOutput << "    comisd xmm0, xmm2\n"; // Compare xmm0 to 1.0
-        m_codeSectionAsmOutput << "    jb .udtoaFractionDidNotStartWith9\n"; // Compare xmm0 to 1.0
+        m_codeSectionAsmOutput << "    jb .dtoaFractionDidNotStartWith9\n"; // Compare xmm0 to 1.0
         m_codeSectionAsmOutput << "    mov bl, 1\n"; // 1 to bl to indicate that fractional part started with 9
-        m_codeSectionAsmOutput << "    .udtoaFractionDidNotStartWith9:\n"; // 1 to bh
+        m_codeSectionAsmOutput << "    .dtoaFractionDidNotStartWith9:\n"; // 1 to bh
 
         // Convert fractional part to int
         m_codeSectionAsmOutput << "    mov rax, MUL_FRAC_TO_INT\n"; // Let rax point to big number for multiplication of fractional part
@@ -828,11 +853,11 @@ private:
 
         // Remove trailing zeros from rax (from decimal places)
         m_codeSectionAsmOutput << "\n";
-        m_codeSectionAsmOutput << "    .udtoaRemoveTrailingZerosLoop:\n";
+        m_codeSectionAsmOutput << "    .dtoaRemoveTrailingZerosLoop:\n";
         m_codeSectionAsmOutput << "        xor edx, edx\n"; // Empty edx
         m_codeSectionAsmOutput << "        div rcx\n"; // Divide eax by 10, remainder in edx
         m_codeSectionAsmOutput << "        test edx, edx\n"; // If remainder is zero, we have a trailing zero
-        m_codeSectionAsmOutput << "        jz .udtoaRemoveTrailingZerosLoop\n";
+        m_codeSectionAsmOutput << "        jz .dtoaRemoveTrailingZerosLoop\n";
         m_codeSectionAsmOutput << "\n";
 
         // Convert first non-0 digit of rax to ascii (as this is the remainder left in edx from previous loop)
@@ -846,34 +871,34 @@ private:
 
         // If rax is 0 then there was only one number in fractional part
         m_codeSectionAsmOutput << "    test rax, rax\n"; // ZeroFlag set to 1 if eax is 0
-        m_codeSectionAsmOutput << "    jz .udtoaAfterFracConv\n";
+        m_codeSectionAsmOutput << "    jz .dtoaAfterFracConv\n";
 
         // Transform rax to char array
         m_codeSectionAsmOutput << "\n";
-        m_codeSectionAsmOutput << "    .udtoaDigitToAsciiLoop:\n";
+        m_codeSectionAsmOutput << "    .dtoaDigitToAsciiLoop:\n";
         m_codeSectionAsmOutput << "        xor edx, edx\n"; // Empty edx
         m_codeSectionAsmOutput << "        div rcx\n"; // Divide eax by 10, remainder in edx
         m_codeSectionAsmOutput << "        add edx, '0'\n"; // Convert remainder to ascii (adding ascii value of 0)
         m_codeSectionAsmOutput << "        dec rsi\n"; // Move stack pointer down
         m_codeSectionAsmOutput << "        mov [rsi], dl\n"; // Add lowest byte from edx (ascii value of remainder) to stack
         m_codeSectionAsmOutput << "        test rax, rax\n"; // ZeroFlag set to 1 if eax is 0
-        m_codeSectionAsmOutput << "        jnz .udtoaDigitToAsciiLoop\n"; // Process next digit if still number (non-zero) in eax
+        m_codeSectionAsmOutput << "        jnz .dtoaDigitToAsciiLoop\n"; // Process next digit if still number (non-zero) in eax
         m_codeSectionAsmOutput << "\n";
 
-        m_codeSectionAsmOutput << "    .udtoaAfterFracConv:\n"; // Jump here to not do conversion of fractional part (needed if only 1 number inf ractional part)
+        m_codeSectionAsmOutput << "    .dtoaAfterFracConv:\n"; // Jump here to not do conversion of fractional part (needed if only 1 number inf ractional part)
         m_codeSectionAsmOutput << "    test bh, bh\n"; // If 0, all numbers are converted
-        m_codeSectionAsmOutput << "    jz .udtoa_finish\n";
+        m_codeSectionAsmOutput << "    jz .dtoa_finish\n";
 
         // Revert the adding of 0.1 above (rsi currently points to char of first digit after decimal point)
         m_codeSectionAsmOutput << "    sub edx, '0'\n"; // Convert remainder back to int
         m_codeSectionAsmOutput << "    test bl, bl\n"; // If bl is zero, 1 needs to be subtracted from value, because it wasn't 9 before
-        m_codeSectionAsmOutput << "    jnz .udtoaFirstCharInReaminderNeedsToBe9\n"; // Else the change value to 9
+        m_codeSectionAsmOutput << "    jnz .dtoaFirstCharInReaminderNeedsToBe9\n"; // Else the change value to 9
         m_codeSectionAsmOutput << "    sub edx, 1\n"; // Subtract one
         m_codeSectionAsmOutput << "    add edx, '0'\n"; // Ascii again
-        m_codeSectionAsmOutput << "    jmp .udtoaOverrideFirstCharInRemainder\n"; // Jump next part
-        m_codeSectionAsmOutput << "    .udtoaFirstCharInReaminderNeedsToBe9:\n"; // Subtract one
+        m_codeSectionAsmOutput << "    jmp .dtoaOverrideFirstCharInRemainder\n"; // Jump next part
+        m_codeSectionAsmOutput << "    .dtoaFirstCharInReaminderNeedsToBe9:\n"; // Subtract one
         m_codeSectionAsmOutput << "    mov edx, '9'\n"; // Set edx to char '9'
-        m_codeSectionAsmOutput << "    .udtoaOverrideFirstCharInRemainder:\n"; // Subtract one
+        m_codeSectionAsmOutput << "    .dtoaOverrideFirstCharInRemainder:\n"; // Subtract one
         m_codeSectionAsmOutput << "    mov [rsi], dl\n"; // Override previous char
 
         // Add decimal point char
@@ -883,16 +908,24 @@ private:
         // Convert number before decimal point to char array
         m_codeSectionAsmOutput << "    mov rax, rdi\n"; // Move number to rax
         m_codeSectionAsmOutput << "    mov bh, 0\n"; // 0 to bh (-> meaning that now number before decimal point is converted)
-        m_codeSectionAsmOutput << "    jmp .udtoaDigitToAsciiLoop\n";
+        m_codeSectionAsmOutput << "    jmp .dtoaDigitToAsciiLoop\n";
 
         m_codeSectionAsmOutput << "\n";
-        m_codeSectionAsmOutput << "    .udtoa_finish:\n";
+        m_codeSectionAsmOutput << "    .dtoa_finish:\n";
+
+        // Add "-" char if needed
+        m_codeSectionAsmOutput << "        test r8, r8\n"; // If r8 is not 0 then number in xmm0 is negative
+        m_codeSectionAsmOutput << "        jz .dtoaNoNegativeSign\n";
+        m_codeSectionAsmOutput << "        dec rsi\n";
+        m_codeSectionAsmOutput << "        mov BYTE [rsi], '-'\n";
+        m_codeSectionAsmOutput << "        .dtoaNoNegativeSign:\n";
+
         m_codeSectionAsmOutput << "        lea edx, [rsp]\n"; // Address of rsp to edx
         m_codeSectionAsmOutput << "        sub edx, esi\n"; // Subtract address in esi from edx to get length between last and first char
         m_codeSectionAsmOutput << "        ret\n";
         m_codeSectionAsmOutput << "\n";
 
-        // rsi now points to first digit (in ascii) in memory, other digits are stored above in memory
+        // rsi now points to first digit/negative sign (in ascii) in memory, other digits are stored above in memory
         // rdx now contains the number of chars that were stored in memory
     }
 

@@ -177,4 +177,11 @@ if (stringVal) {
 }
 println("--");
 
+println("# Print some negative numbers (-1, -4555, -336.76, -999999999999999.5)...");
+let t = 4000 - 8555;
+println(0 - 1);
+println(t);
+println((0 - 673.52) / 2.0);
+println("--");
+
 println("# Test program finished!");
