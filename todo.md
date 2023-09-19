@@ -1,0 +1,8 @@
+- negate numbers
+- reaassign indentifiers
+- while loops
+- for loops
+- functions
+- objects/structs
+- classes
+- optimizer for produced asm
