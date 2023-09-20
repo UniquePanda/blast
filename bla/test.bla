@@ -5,7 +5,7 @@
 println("# Begin of test program (\"--\" marks end of each test)...");
 println("");
 
-println("# Performing number assignments and printing number addition, should be 180...");
+println("# Performing number assignments and integer arithmetics, should be 180...");
 let a = 4 + 2 * 3; // 10
 let b = a * 2 - 2; // 18
 let c = 2 * b / 2 + 2; // 20
@@ -14,10 +14,23 @@ let d = c * (2 + 2 * (2 + 1)); // 160
 println(d + c);
 println("--");
 
-println("# Assigning another number, printing it without line break, should be 182...");
-let e = a * b + 2;
-print(e);
-println("--");
+println("# Performing more arithmetrics devided over multiple lines, printing without line break, should be 93...");
+let e
+    =
+    (
+        a * b
+        + 2
+        + 4
+    )
+    / 2;
+
+print(
+    e
+);
+println("--")
+
+// Semi colon can also be on a different line.
+;
 
 println("# Printing 12 with line break...");
 println(12);

@@ -97,6 +97,7 @@ struct ElseStmtNode {
 
 struct StmtNode {
     std::variant<BuiltInFuncStmtNode*, LetStmtNode*, ScopeNode*, IfStmtNode*, ElseIfStmtNode*, ElseStmtNode*> var;
+    size_t lineNumber = 0;
 };
 
 struct ProgNode {
@@ -131,7 +132,7 @@ public:
             return term;
         } else if (peek().value().type == TokenType::quot) {
             if (!peek(1).has_value() || peek(1).value().type != TokenType::str_lit) {
-                failInvalidExpr();
+                failInvalidExpr("Quote must be followed by a string");
             }
 
             if (!peek(2).has_value() || peek(2).value().type != TokenType::quot) {
@@ -169,7 +170,7 @@ public:
             auto expr = parseExpr();
 
             if (!expr.has_value()) {
-                failMissingExpr();
+                failMissingExpr("Parenthesis without expression");
             }
 
             if (!peek().has_value() || peek().value().type != TokenType::close_paren) {
@@ -231,6 +232,8 @@ public:
     }
 
     std::optional<ExprNode*> parseExpr(size_t precedence = 0) {
+        consumeLineBreaks();
+
         m_lastStmt = {};
 
         if (!peek().has_value()) {
@@ -248,6 +251,8 @@ public:
         }
 
         if (auto lhsExpr = parseExpr(precedence + 1)) {
+            consumeLineBreaks();
+
             if (peek().value().precedence != precedence) {
                 return lhsExpr;
             }
@@ -281,10 +286,17 @@ public:
         // Open curly
         consume();
 
+        consumeLineBreaks();
+
         auto scopeStmt = m_allocator.alloc<ScopeNode>();
 
-        while (auto stmt = parseStmt()) {
+        auto stmt = parseStmt();
+        while (stmt) {
             scopeStmt->stmts.push_back(stmt.value());
+
+            consumeLineBreaks();
+
+            stmt = parseStmt();
         }
 
         if (!peek().has_value()) {
@@ -323,11 +335,16 @@ public:
             consume();
             consume();
 
+            consumeLineBreaks();
+
             if (auto exprNode = parseExpr()) {
                 builtInFuncStmt->expr = exprNode.value();
             } else {
-                failInvalidExpr();
+                failInvalidExpr("Unknown expression as function parameter");
             }
+
+            consumeLineBreaks();
+
             if (peek().has_value() && peek().value().type == TokenType::close_paren) {
                 consume();
             } else {
@@ -352,11 +369,7 @@ public:
             }
 
             if (peek(1).value().type != TokenType::ident) {
-                failMissingIdent();
-            }
-
-            if (peek(2).value().type != TokenType::eq) {
-                failMissingOperator();
+                failMissingIdent("let statement without identifier");
             }
 
             // let
@@ -366,13 +379,21 @@ public:
             auto letStmt = m_allocator.alloc<LetStmtNode>();
             letStmt->ident = consume();
 
+            consumeLineBreaks();
+
+            if (peek().value().type != TokenType::eq) {
+                failMissingOperator("let statement without equal sign");
+            }
+
             // equal sign
             consume();
+
+            consumeLineBreaks();
 
             if (auto expr = parseExpr()) {
                 letStmt->expr = expr.value();
             } else {
-                failInvalidExpr();
+                failInvalidExpr("Unknown expression as value in let statement");
             }
 
             consumeSemi();
@@ -409,7 +430,7 @@ public:
             if (auto expr = parseExpr()) {
                 ifStmt->expr = expr.value();
             } else {
-                failMissingExpr();
+                failMissingExpr("If statement without expression");
             }
 
             if (peek().value().type != TokenType::close_paren) {
@@ -452,7 +473,7 @@ public:
             if (auto expr = parseExpr()) {
                 elseIfStmt->expr = expr.value();
             } else {
-                failMissingExpr();
+                failMissingExpr("Elseif statement without expression");
             }
 
             if (peek().value().type != TokenType::close_paren) {
@@ -508,7 +529,11 @@ public:
     std::optional<ProgNode> parseProg() {
         ProgNode prog;
         while (peek().has_value()) {
-            if (auto stmt = parseStmt()) {
+            if (peek().value().type == TokenType::line_break) {
+                m_lineNumber++;
+                consume();
+            } else if (auto stmt = parseStmt()) {
+                stmt.value()->lineNumber = m_lineNumber;
                 prog.stmts.push_back(stmt.value());
             } else {
                 failInvalidStmt();
@@ -534,6 +559,9 @@ private:
     }
 
     void consumeSemi() {
+        // Always allow line breaks before semicolons.
+        consumeLineBreaks();
+
         if (peek().has_value() && peek().value().type == TokenType::semi) {
             consume();
         } else {
@@ -541,8 +569,15 @@ private:
         }
     }
 
-    void fail(std::string msg) const {
-        std::cerr << msg << std::endl;
+    void consumeLineBreaks() {
+        while (peek().value().type == TokenType::line_break) {
+            m_lineNumber++;
+            consume();
+        }
+    }
+
+    void fail(const std::string& msg) const {
+        std::cerr << "Line " << m_lineNumber << ": " << msg << std::endl;
         exit(EXIT_FAILURE); 
     }
 
@@ -558,23 +593,23 @@ private:
         fail("Invalid scope");
     }
 
-    void failInvalidExpr() const {
-        fail("Invalid expression");
+    void failInvalidExpr(const std::string& detail) const {
+        fail("Invalid expression: " + detail);
     }
 
-    void failMissingExpr() const {
-        fail("Missing expression");
+    void failMissingExpr(const std::string& detail) const {
+        fail("Missing expression: " + detail);
     }
 
-    void failMissingIdent() const {
-        fail("Missing identifier");
+    void failMissingIdent(const std::string& detail) const {
+        fail("Missing identifier: " + detail);
     }
 
-    void failMissingOperator() const {
-        fail("Missing operator");
+    void failMissingOperator(const std::string& detail) const {
+        fail("Missing operator: " + detail);
     }
 
-    void failMissingStmt(std::string stmtName = "") const {
+    void failMissingStmt(const std::string& stmtName = "") const {
         fail("Missing statement" + (stmtName == "" ? "" : ": " + stmtName));
     }
 
@@ -612,6 +647,7 @@ private:
 
     const std::vector<Token> m_tokens;
     size_t m_index = 0;
+    size_t m_lineNumber = 1;
     TokenType m_lastStmt = {};
     ArenaAllocator m_allocator;
 };

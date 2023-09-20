@@ -310,7 +310,7 @@ public:
                                 isInt = false;
                                 generator.m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
                             } else {
-                                generator.failUnknownConstType();
+                                generator.failUnknownDataType();
                             }
                         } else {
                             if (type == TokenType::bool_lit) {
@@ -322,7 +322,7 @@ public:
                                 generator.m_codeSectionAsmOutput << "    mov [TEMP_DBL], rdi\n";
                                 generator.m_codeSectionAsmOutput << "    mov rdi, TEMP_DBL\n";
                             } else if (type != TokenType::int_lit) { // If it's an int, the value is already in rdi
-                                generator.failUnknownVarType();
+                                generator.failUnknownDataType();
                             }
                         }
                     }
@@ -529,6 +529,7 @@ public:
         m_codeSectionAsmOutput << "_start:\n";
 
         for (const StmtNode* stmt : m_prog.stmts) {
+            m_lineNumber = stmt->lineNumber;
             generateStmt(stmt);
         }
 
@@ -681,7 +682,7 @@ private:
             if (std::get<1>(popInfo.value())) {
                 TokenType type = std::get<2>(popInfo.value());
                 if (type == TokenType::str_lit) {
-                    failOperatorMissmatch();
+                    failUnexpectedDataType("string");
                 }
 
                 if (type == TokenType::int_lit || type == TokenType::bool_lit) {
@@ -701,12 +702,12 @@ private:
     void popWithConstOnlyInt(const std::string& reg) {
         if (const auto popInfo = pop(reg)) {
             if (std::get<2>(popInfo.value()) != TokenType::int_lit) {
-                failUnexpectedConstType();
+                failExpectedDifferentDataType("int");
             }
         }
     }
 
-    std::string internalVarIdent(std::string additional = "") {
+    std::string internalVarIdent(const std::string& additional = "") {
         m_internalVarsCount++;
         return "<VAR_" + additional + std::to_string(m_internalVarsCount) + ">";
     }
@@ -986,8 +987,8 @@ private:
         m_codeSectionAsmOutput << "\n";
     }
 
-    void fail(std::string msg) const {
-        std::cerr << msg << std::endl;
+    void fail(const std::string& msg) const {
+        std::cerr << "Line " << m_lineNumber << ": " << msg << std::endl;
         exit(EXIT_FAILURE); 
     }
 
@@ -1003,20 +1004,16 @@ private:
         fail("Unknown built in function: " + funcName);
     }
 
-    void failUnknownVarType() const {
-        fail("Unknown var type");
+    void failUnknownDataType() const {
+        fail("Unknown data type");
     }
 
-    void failUnknownConstType() const {
-        fail("Unknown const type");
+    void failExpectedDifferentDataType(const std::string& expectedDataType) const {
+        fail("Expected different data type. Expected: " + expectedDataType);
     }
 
-    void failUnexpectedConstType() const {
-        fail("Unexpected const type");
-    }
-
-    void failOperatorMissmatch() const {
-        fail("Operator missmatch");
+    void failUnexpectedDataType(const std::string& unexpectedDataType) const {
+        fail("Encountered unexpected data type: " + unexpectedDataType);
     }
 
     struct Var {
@@ -1031,6 +1028,7 @@ private:
     };
 
     const ProgNode m_prog;
+    size_t m_lineNumber = 1;
     std::stringstream m_asmOutput;
     std::stringstream m_dataSectionAsmOutput;
     std::stringstream m_codeSectionAsmOutput;

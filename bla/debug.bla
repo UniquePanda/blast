@@ -1,5 +1,3 @@
-let x = 1;
-let y = 2;
-let c = x - y;
+let x = 1.0;
 
-println(c);
+println(x);

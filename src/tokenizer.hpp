@@ -5,7 +5,7 @@
 #include <vector>
 
 enum class TokenType {
-    unknown,
+    unknown, line_break,
     let, ident, int_lit, dbl_lit, str_lit, bool_lit,
     built_in_func, if_, elseif, else_,
     eq, open_paren, close_paren, open_curly, close_curly, semi, quot,
@@ -83,7 +83,7 @@ public:
                 buf.push_back(consume());
 
                 if (!peek().has_value() || !std::isdigit(peek().value())) {
-                    failUnxpectedNonDigit();
+                    failUnxpectedNonDigit(peek().has_value() ? peek().value() : ' ');
                 }
 
                 while (peek().has_value() && std::isdigit(peek().value())) {
@@ -113,7 +113,7 @@ public:
                                 buf.push_back(consume());
                                 continue;
                             } else {
-                                failUnxpectedEscape();
+                                failUnxpectedEscape(peek().value());
                             }
                         }
                     }
@@ -175,12 +175,26 @@ public:
                             break;
                         }
 
+                        if (peek().value() == '\n') {
+                            m_lineNumber++;
+                            tokens.push_back({ .type = TokenType::line_break });
+                        }
+
                         consume();
                     }
                 } else {
                     tokens.push_back({ .type = TokenType::slash, .precedence = 1 });
                     consume();
                 }
+            } else if (peek().value() == '\n') {
+                m_lineNumber++;
+                tokens.push_back({ .type = TokenType::line_break });
+                consume();
+            } else if (peek(1).has_value() && peek().value() == '\r' && peek(1).value() == '\n') {
+                m_lineNumber++;
+                tokens.push_back({ .type = TokenType::line_break });
+                consume();
+                consume();
             } else if (std::isspace(peek().value())) {
                 consume();
             } else {
@@ -216,23 +230,24 @@ private:
         return token;
     }
 
-    void fail(std::string msg) const {
-        std::cerr << msg << std::endl;
-        exit(EXIT_FAILURE); 
+    void fail(const std::string& msg) const {
+        std::cerr << "Line " << m_lineNumber << ": " << msg << std::endl;
+        exit(EXIT_FAILURE);
     }
 
-    void failUnxpectedEscape() const {
-        fail("Unexpected escape sequence");
+    void failUnxpectedEscape(const char& unknownEscapedChar) const {
+        fail("Unexpected escape sequence: \\" + std::string(1, unknownEscapedChar));
     }
 
-    void failUnknownChar(char unknownChar) const {
+    void failUnknownChar(const char& unknownChar) const {
         fail("Unknown character: " + std::string(1, unknownChar));
     }
 
-    void failUnxpectedNonDigit() const {
-        fail("Unexpected non-digit character");
+    void failUnxpectedNonDigit(const char&  unexpectedChar) const {
+        fail("Unexpected non-digit character" + (unexpectedChar != ' ' ? ": " + std::string(1, unexpectedChar) : ""));
     }
 
     const std::string m_source;
     size_t m_index = 0;
+    size_t m_lineNumber = 1;
 };
