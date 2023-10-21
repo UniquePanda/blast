@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <map>
 
+#include "utils.hpp"
 #include "parser.hpp"
 
 class Generator {
@@ -58,7 +59,7 @@ public:
                 auto identName = identTerm->ident.value.value();
                 bool isConst = generator.m_consts.contains(identName);
                 if (!isConst && !generator.m_vars.contains(identName)) {
-                    generator.failUndeclaredIdentifer(identName);
+                    failUndeclaredIdentifer(identName, generator.m_lineNumber);
                 }
 
                 if (isConst) {
@@ -296,7 +297,7 @@ public:
                         isConst = std::get<1>(popInfo.value());
                         TokenType type = std::get<2>(popInfo.value());
 
-                        if (isConst) { // If not a const, rdi will hold the value directly
+                        if (isConst) {
                             if (type == TokenType::int_lit) {
                                 generator.m_codeSectionAsmOutput << "    mov rdi, [rdi]\n"; // Just move number into rdi as input for itoa
                             } else if (type == TokenType::dbl_lit) {
@@ -310,9 +311,9 @@ public:
                                 isInt = false;
                                 generator.m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
                             } else {
-                                generator.failUnknownDataType();
+                                failUnknownDataType(generator.m_lineNumber);
                             }
-                        } else {
+                        } else { // If not a const, rdi will hold the value directly
                             if (type == TokenType::bool_lit) {
                                 isInt = false;
                                 generator.m_codeSectionAsmOutput << "    call movBoolStr\n"; // rsi points to bool string ("true"/"false"), rdx has string length
@@ -322,7 +323,7 @@ public:
                                 generator.m_codeSectionAsmOutput << "    mov [TEMP_DBL], rdi\n";
                                 generator.m_codeSectionAsmOutput << "    mov rdi, TEMP_DBL\n";
                             } else if (type != TokenType::int_lit) { // If it's an int, the value is already in rdi
-                                generator.failUnknownDataType();
+                                failUnknownDataType(generator.m_lineNumber);
                             }
                         }
                     }
@@ -375,7 +376,7 @@ public:
                         generator.m_codeSectionAsmOutput << "    mov [rsi], r8b\n";
                     }
                 } else {
-                    generator.failUnknownBuiltInFunc(builtInFuncStmt->funcName);
+                    failUnknownBuiltInFunc(builtInFuncStmt->funcName, generator.m_lineNumber);
                 }
             }
 
@@ -384,10 +385,10 @@ public:
                     generator.m_vars.contains(letStmt->ident.value.value())
                     || generator.m_consts.contains(letStmt->ident.value.value())
                 ) {
-                    generator.failAlreadyUsedIdentifer(letStmt->ident.value.value());
+                    failAlreadyUsedIdentifer(letStmt->ident.value.value(), generator.m_lineNumber);
                 }
 
-                // TODO: Quite hacky, but oh well :D
+                // TODO: The "std::holds_alternative" stuff below seems quite hacky, but oh well :D
                 TokenType tokenType = {};
                 size_t valueLength = 0;
                 if (std::holds_alternative<TermNode*>(letStmt->expr->var)) {
@@ -682,7 +683,7 @@ private:
             if (std::get<1>(popInfo.value())) {
                 TokenType type = std::get<2>(popInfo.value());
                 if (type == TokenType::str_lit) {
-                    failUnexpectedDataType("string");
+                    failUnexpectedDataType("string", m_lineNumber);
                 }
 
                 if (type == TokenType::int_lit || type == TokenType::bool_lit) {
@@ -702,7 +703,7 @@ private:
     void popWithConstOnlyInt(const std::string& reg) {
         if (const auto popInfo = pop(reg)) {
             if (std::get<2>(popInfo.value()) != TokenType::int_lit) {
-                failExpectedDifferentDataType("int");
+                failExpectedDifferentDataType("int", m_lineNumber);
             }
         }
     }
@@ -985,35 +986,6 @@ private:
         m_codeSectionAsmOutput << "    syscall\n";
         m_codeSectionAsmOutput << "    ret\n";
         m_codeSectionAsmOutput << "\n";
-    }
-
-    void fail(const std::string& msg) const {
-        std::cerr << "Line " << m_lineNumber << ": " << msg << std::endl;
-        exit(EXIT_FAILURE); 
-    }
-
-    void failAlreadyUsedIdentifer(const std::string& identName) const {
-        fail("Identifier already used: " + identName);
-    }
-
-    void failUndeclaredIdentifer(const std::string& identName) const {
-        fail("Undeclared identifier: " + identName);
-    }
-
-    void failUnknownBuiltInFunc(const std::string& funcName) const {
-        fail("Unknown built in function: " + funcName);
-    }
-
-    void failUnknownDataType() const {
-        fail("Unknown data type");
-    }
-
-    void failExpectedDifferentDataType(const std::string& expectedDataType) const {
-        fail("Expected different data type. Expected: " + expectedDataType);
-    }
-
-    void failUnexpectedDataType(const std::string& unexpectedDataType) const {
-        fail("Encountered unexpected data type: " + unexpectedDataType);
     }
 
     struct Var {

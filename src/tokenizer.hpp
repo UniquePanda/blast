@@ -4,13 +4,7 @@
 #include <optional>
 #include <vector>
 
-enum class TokenType {
-    unknown, line_break,
-    let, ident, int_lit, dbl_lit, str_lit, bool_lit,
-    built_in_func, if_, elseif, else_,
-    eq, open_paren, close_paren, open_curly, close_curly, semi, quot,
-    plus, minus, star, slash
-};
+#include "./utils.hpp"
 
 struct Token {
     static const size_t MAX_PRECEDENCE = 2;
@@ -83,7 +77,7 @@ public:
                 buf.push_back(consume());
 
                 if (!peek().has_value() || !std::isdigit(peek().value())) {
-                    failUnxpectedNonDigit(peek().has_value() ? peek().value() : ' ');
+                    failUnxpectedNonDigit(peek().has_value() ? peek().value() : ' ', m_lineNumber);
                 }
 
                 while (peek().has_value() && std::isdigit(peek().value())) {
@@ -113,7 +107,7 @@ public:
                                 buf.push_back(consume());
                                 continue;
                             } else {
-                                failUnxpectedEscape(peek().value());
+                                failUnxpectedEscape(peek().value(), m_lineNumber);
                             }
                         }
                     }
@@ -198,7 +192,7 @@ public:
             } else if (std::isspace(peek().value())) {
                 consume();
             } else {
-                failUnknownChar(peek().value());
+                failUnknownChar(peek().value(), m_lineNumber);
             }
         }
 
@@ -228,23 +222,6 @@ private:
         token.type = TokenType::built_in_func;
         token.value = funcName;
         return token;
-    }
-
-    void fail(const std::string& msg) const {
-        std::cerr << "Line " << m_lineNumber << ": " << msg << std::endl;
-        exit(EXIT_FAILURE);
-    }
-
-    void failUnxpectedEscape(const char& unknownEscapedChar) const {
-        fail("Unexpected escape sequence: \\" + std::string(1, unknownEscapedChar));
-    }
-
-    void failUnknownChar(const char& unknownChar) const {
-        fail("Unknown character: " + std::string(1, unknownChar));
-    }
-
-    void failUnxpectedNonDigit(const char&  unexpectedChar) const {
-        fail("Unexpected non-digit character" + (unexpectedChar != ' ' ? ": " + std::string(1, unexpectedChar) : ""));
     }
 
     const std::string m_source;

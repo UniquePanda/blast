@@ -4,6 +4,7 @@
 #include <vector>
 #include <optional>
 
+#include "utils.hpp"
 #include "arenaAllocator.hpp"
 #include "tokenizer.hpp"
 
@@ -132,11 +133,11 @@ public:
             return term;
         } else if (peek().value().type == TokenType::quot) {
             if (!peek(1).has_value() || peek(1).value().type != TokenType::str_lit) {
-                failInvalidExpr("Quote must be followed by a string");
+                failInvalidExpr("Quote must be followed by a string", m_lineNumber);
             }
 
             if (!peek(2).has_value() || peek(2).value().type != TokenType::quot) {
-                failMissingQuot();
+                failMissingQuot(m_lineNumber);
             }
 
             // Opening quotation mark.
@@ -164,19 +165,19 @@ public:
             term->var = identTerm;
             return term;
         } else if (peek().value().type == TokenType::open_paren) {
-            // Opening prenthesis
+            // Opening parenthesis
             consume();
 
             auto expr = parseExpr();
 
             if (!expr.has_value()) {
-                failMissingExpr("Parenthesis without expression");
+                failMissingExpr("Parenthesis without expression", m_lineNumber);
             }
 
             if (!peek().has_value() || peek().value().type != TokenType::close_paren) {
-                failMissingClosingParen();
+                failMissingClosingParen(m_lineNumber);
             }
-            // Closing prenthesis
+            // Closing parenthesis
             consume();
 
             auto parenTerm = m_allocator.alloc<ParenTermNode>();
@@ -199,7 +200,7 @@ public:
             specificBinExpr->rhs = rhs.value();
             return specificBinExpr;
         } else {
-            failBinaryRHS();
+            failBinaryRHS(m_lineNumber);
         }
 
         return {};
@@ -225,7 +226,7 @@ public:
                 binExpr->var = parseSpecificBinExpr<DivBinExprNode>(lhsExpr, precedence);
                 break;
             default:
-                failUnsupportedBinaryOperator();
+                failUnsupportedBinaryOperator(m_lineNumber);
         }
 
         return binExpr;
@@ -276,11 +277,11 @@ public:
         }
 
         if (peek().value().type != TokenType::open_curly) {
-            failMissingOpenCurly();
+            failMissingOpenCurly(m_lineNumber);
         }
 
         if (!peek(1).has_value()) {
-            failUnexpectedEOF();
+            failUnexpectedEOF(m_lineNumber);
         }
 
         // Open curly
@@ -300,11 +301,11 @@ public:
         }
 
         if (!peek().has_value()) {
-            failUnexpectedEOF();
+            failUnexpectedEOF(m_lineNumber);
         }
 
         if (peek().value().type != TokenType::close_curly) {
-            failMissingClosingCurly();
+            failMissingClosingCurly(m_lineNumber);
         }
 
         // Closing curly
@@ -320,11 +321,11 @@ public:
 
         if (peek().value().type == TokenType::built_in_func) {
             if (!peek(1).has_value()) {
-                failUnexpectedEOF();
+                failUnexpectedEOF(m_lineNumber);
             }
 
             if (peek(1).value().type != TokenType::open_paren) {
-                failMissingOpenParen();
+                failMissingOpenParen(m_lineNumber);
             }
 
             auto builtInFuncStmt = m_allocator.alloc<BuiltInFuncStmtNode>();
@@ -340,7 +341,7 @@ public:
             if (auto exprNode = parseExpr()) {
                 builtInFuncStmt->expr = exprNode.value();
             } else {
-                failInvalidExpr("Unknown expression as function parameter");
+                failInvalidExpr("Unknown expression as function parameter", m_lineNumber);
             }
 
             consumeLineBreaks();
@@ -348,7 +349,7 @@ public:
             if (peek().has_value() && peek().value().type == TokenType::close_paren) {
                 consume();
             } else {
-                failMissingClosingParen();
+                failMissingClosingParen(m_lineNumber);
             }
 
             consumeSemi();
@@ -365,11 +366,11 @@ public:
             return stmt;
         } else if (peek().value().type == TokenType::let) {
             if (!peek(1).has_value()) {
-                failUnexpectedEOF();
+                failUnexpectedEOF(m_lineNumber);
             }
 
             if (peek(1).value().type != TokenType::ident) {
-                failMissingIdent("let statement without identifier");
+                failMissingIdent("let statement without identifier", m_lineNumber);
             }
 
             // let
@@ -382,7 +383,7 @@ public:
             consumeLineBreaks();
 
             if (peek().value().type != TokenType::eq) {
-                failMissingOperator("let statement without equal sign");
+                failMissingOperator("let statement without equal sign", m_lineNumber);
             }
 
             // equal sign
@@ -393,7 +394,7 @@ public:
             if (auto expr = parseExpr()) {
                 letStmt->expr = expr.value();
             } else {
-                failInvalidExpr("Unknown expression as value in let statement");
+                failInvalidExpr("Unknown expression as value in let statement", m_lineNumber);
             }
 
             consumeSemi();
@@ -410,15 +411,15 @@ public:
                 stmt->var = scopeStmt.value();
                 return stmt;
             } else {
-                failInvalidScope();
+                failInvalidScope(m_lineNumber);
             }
         } else if (peek().value().type == TokenType::if_) {
             if (!peek(1).has_value()) {
-                failUnexpectedEOF();
+                failUnexpectedEOF(m_lineNumber);
             }
 
             if (peek(1).value().type != TokenType::open_paren) {
-                failMissingOpenParen();
+                failMissingOpenParen(m_lineNumber);
             }
 
             // if and open parenthesis
@@ -430,11 +431,11 @@ public:
             if (auto expr = parseExpr()) {
                 ifStmt->expr = expr.value();
             } else {
-                failMissingExpr("If statement without expression");
+                failMissingExpr("If statement without expression", m_lineNumber);
             }
 
             if (peek().value().type != TokenType::close_paren) {
-                failMissingClosingParen();
+                failMissingClosingParen(m_lineNumber);
             }
 
             // Closing parenthesis
@@ -443,7 +444,7 @@ public:
             if (auto scopeStmt = parseScope()) {
                 ifStmt->scope = scopeStmt.value();
             } else {
-                failInvalidScope();
+                failInvalidScope(m_lineNumber);
             }
 
             m_lastStmt = TokenType::if_;
@@ -453,15 +454,15 @@ public:
             return stmt;
         } else if (peek().value().type == TokenType::elseif) {
             if (m_lastStmt != TokenType::if_ && m_lastStmt != TokenType::elseif) {
-                failMissingStmt("if");
+                failMissingStmt("if", m_lineNumber);
             }
 
             if (!peek(1).has_value()) {
-                failUnexpectedEOF();
+                failUnexpectedEOF(m_lineNumber);
             }
 
             if (peek(1).value().type != TokenType::open_paren) {
-                failMissingOpenParen();
+                failMissingOpenParen(m_lineNumber);
             }
 
             // elseif and open parenthesis
@@ -473,11 +474,11 @@ public:
             if (auto expr = parseExpr()) {
                 elseIfStmt->expr = expr.value();
             } else {
-                failMissingExpr("Elseif statement without expression");
+                failMissingExpr("Elseif statement without expression", m_lineNumber);
             }
 
             if (peek().value().type != TokenType::close_paren) {
-                failMissingClosingParen();
+                failMissingClosingParen(m_lineNumber);
             }
 
             // Closing parenthesis
@@ -486,7 +487,7 @@ public:
             if (auto scopeStmt = parseScope()) {
                 elseIfStmt->scope = scopeStmt.value();
             } else {
-                failInvalidScope();
+                failInvalidScope(m_lineNumber);
             }
 
             m_lastStmt = TokenType::elseif;
@@ -496,11 +497,11 @@ public:
             return stmt;
         } else if (peek().value().type == TokenType::else_) {
             if (m_lastStmt != TokenType::if_ && m_lastStmt != TokenType::elseif) {
-                failMissingStmt("if");
+                failMissingStmt("if", m_lineNumber);
             }
 
             if (!peek(1).has_value()) {
-                failUnexpectedEOF();
+                failUnexpectedEOF(m_lineNumber);
             }
 
             // else
@@ -511,7 +512,7 @@ public:
             if (auto scopeStmt = parseScope()) {
                 elseStmt->scope = scopeStmt.value();
             } else {
-                failInvalidScope();
+                failInvalidScope(m_lineNumber);
             }
 
             m_lastStmt = TokenType::else_;
@@ -536,7 +537,7 @@ public:
                 stmt.value()->lineNumber = m_lineNumber;
                 prog.stmts.push_back(stmt.value());
             } else {
-                failInvalidStmt();
+                failInvalidStmt(m_lineNumber);
             }
         }
 
@@ -565,7 +566,7 @@ private:
         if (peek().has_value() && peek().value().type == TokenType::semi) {
             consume();
         } else {
-            failMissingSemi();
+            failMissingSemi(m_lineNumber);
         }
     }
 
@@ -574,75 +575,6 @@ private:
             m_lineNumber++;
             consume();
         }
-    }
-
-    void fail(const std::string& msg) const {
-        std::cerr << "Line " << m_lineNumber << ": " << msg << std::endl;
-        exit(EXIT_FAILURE); 
-    }
-
-    void failUnexpectedEOF() const {
-        fail("Unexpected end of file");
-    }
-
-    void failInvalidStmt() const {
-        fail("Invalid statement");
-    }
-
-    void failInvalidScope() const {
-        fail("Invalid scope");
-    }
-
-    void failInvalidExpr(const std::string& detail) const {
-        fail("Invalid expression: " + detail);
-    }
-
-    void failMissingExpr(const std::string& detail) const {
-        fail("Missing expression: " + detail);
-    }
-
-    void failMissingIdent(const std::string& detail) const {
-        fail("Missing identifier: " + detail);
-    }
-
-    void failMissingOperator(const std::string& detail) const {
-        fail("Missing operator: " + detail);
-    }
-
-    void failMissingStmt(const std::string& stmtName = "") const {
-        fail("Missing statement" + (stmtName == "" ? "" : ": " + stmtName));
-    }
-
-    void failUnsupportedBinaryOperator() const {
-        fail("Unsupported binary operator");
-    }
-
-    void failBinaryRHS() const {
-        fail("Missing right hand side expression");
-    }
-
-    void failMissingOpenParen() const {
-        fail("Missing opening parenthesis");
-    }
-
-    void failMissingClosingParen() const {
-        fail("Missing closing parenthesis");
-    }
-
-    void failMissingOpenCurly() const {
-        fail("Missing opening curly brace");
-    }
-
-    void failMissingClosingCurly() const {
-        fail("Missing closing curly brace");
-    }
-
-    void failMissingQuot() const {
-        fail("Missing quotation mark");
-    }
-
-    void failMissingSemi() const {
-        fail("Missing semicolon");
     }
 
     const std::vector<Token> m_tokens;
