@@ -24,8 +24,11 @@ let e
     )
     / 2;
 
+// Test assignment of identifier to another identifer
+let e2 = e;
+
 print(
-    e
+    e2
 );
 println("--")
 

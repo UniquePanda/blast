@@ -2,6 +2,7 @@
 
 #include <variant>
 #include <vector>
+#include <set>
 #include <optional>
 
 #include "utils.hpp"
@@ -159,6 +160,10 @@ public:
             term->var = boolLitTerm;
             return term;
         } else if (peek().value().type == TokenType::ident) {
+            if (!m_idents.contains(peek().value().value.value())) {
+                failUndeclaredIdentifer(peek().value().value.value(), m_lineNumber);
+            }
+
             auto identTerm = m_allocator.alloc<IdentTermNode>();
             identTerm->ident = consume();
             auto term = m_allocator.alloc<TermNode>();
@@ -403,6 +408,9 @@ public:
 
             auto stmt = m_allocator.alloc<StmtNode>();
             stmt->var = letStmt;
+
+            m_idents.insert(letStmt->ident.value.value());
+
             return stmt;
         } else if (peek().value().type == TokenType::open_curly) {
             // Don't set m_lastStmt here, because scopes are often used between other statements which might depend on each other.
@@ -581,5 +589,6 @@ private:
     size_t m_index = 0;
     size_t m_lineNumber = 1;
     TokenType m_lastStmt = {};
+    std::set<std::string> m_idents {};
     ArenaAllocator m_allocator;
 };

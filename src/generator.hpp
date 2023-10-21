@@ -134,25 +134,26 @@ public:
                 generator.popWithConstNoStrLit("rax", "xmm0");
                 generator.popWithConstNoStrLit("rbx", "xmm1");
 
+                bool shouldPushDbl = true;
+
                 if (!generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int + Int
                     generator.m_codeSectionAsmOutput << "    add rax, rbx\n";
-                    generator.pushInternalIntVar("rax");
+                    shouldPushDbl = false;
                 } else if (generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int + Dbl
                     generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm1, rbx\n";
                     generator.m_codeSectionAsmOutput << "    addsd xmm0, xmm1\n";
-                    generator.pushInternalDblVar("xmm0");
                 } else if (!generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl + Int
                     generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm0, rax\n";
                     generator.m_codeSectionAsmOutput << "    addsd xmm0, xmm1\n";
-                    generator.pushInternalDblVar("xmm0");
                 } else if (generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl + Dbl
                     generator.m_codeSectionAsmOutput << "    addsd xmm0, xmm1\n";
-                    generator.pushInternalDblVar("xmm0");
                 }
+
+                pushResult(shouldPushDbl);
             }
 
             void operator()(const SubBinExprNode* subBinExpr) const {
@@ -162,25 +163,26 @@ public:
                 generator.popWithConstNoStrLit("rbx", "xmm1");
                 generator.popWithConstNoStrLit("rax", "xmm0");
 
+                bool shouldPushDbl = true;
+
                 if (!generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int - Int
                     generator.m_codeSectionAsmOutput << "    sub rax, rbx\n";
-                    generator.pushInternalIntVar("rax");
+                    shouldPushDbl = false;
                 } else if (generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int - Dbl
                     generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm0, rax\n";
                     generator.m_codeSectionAsmOutput << "    subsd xmm0, xmm1\n";
-                    generator.pushInternalDblVar("xmm0");
                 } else if (!generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl - Int
                     generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm1, rbx\n";
                     generator.m_codeSectionAsmOutput << "    subsd xmm0, xmm1\n";
-                    generator.pushInternalDblVar("xmm0");
                 } else if (generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl - Dbl
                     generator.m_codeSectionAsmOutput << "    subsd xmm0, xmm1\n";
-                    generator.pushInternalDblVar("xmm0");
                 }
+
+                pushResult(shouldPushDbl);
             }
 
             void operator()(const MulBinExprNode* mulBinExpr) const {
@@ -190,25 +192,26 @@ public:
                 generator.popWithConstNoStrLit("rax", "xmm0");
                 generator.popWithConstNoStrLit("rbx", "xmm1");
 
+                bool shouldPushDbl = true;
+
                 if (!generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int * Int
                     generator.m_codeSectionAsmOutput << "    imul rax, rbx\n";
-                    generator.pushInternalIntVar("rax");
+                    shouldPushDbl = false;
                 } else if (generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int * Dbl
                     generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm1, rbx\n";
                     generator.m_codeSectionAsmOutput << "    mulsd xmm0, xmm1\n";
-                    generator.pushInternalDblVar("xmm0");
                 } else if (!generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl * Int
                     generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm0, rax\n";
                     generator.m_codeSectionAsmOutput << "    mulsd xmm0, xmm1\n";
-                    generator.pushInternalDblVar("xmm0");
                 } else if (generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl * Dbl
                     generator.m_codeSectionAsmOutput << "    mulsd xmm0, xmm1\n";
-                    generator.pushInternalDblVar("xmm0");
                 }
+
+                pushResult(shouldPushDbl);
             }
 
             void operator()(const DivBinExprNode* divBinExpr) const {
@@ -217,27 +220,35 @@ public:
 
                 generator.popWithConstNoStrLit("rbx", "xmm1"); // Divisor
                 generator.popWithConstNoStrLit("rax", "xmm0"); // Divident
-                
+
+                bool shouldPushDbl = true;
 
                 if (!generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int / Int
                     generator.m_codeSectionAsmOutput << "    cqo\n";
                     generator.m_codeSectionAsmOutput << "    idiv rbx\n";
-                    generator.pushInternalIntVar("rax");
+                    shouldPushDbl = false;
                 } else if (generator.m_wasSecondLastPopDbl && !generator.m_wasLastPopDbl) {
                     // Int / Dbl
                     generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm0, rax\n";
                     generator.m_codeSectionAsmOutput << "    DIVSD xmm0, xmm1\n";
-                    generator.pushInternalDblVar("xmm0");
                 } else if (!generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl / Int
                     generator.m_codeSectionAsmOutput << "    cvtsi2sd xmm1, rbx\n";
                     generator.m_codeSectionAsmOutput << "    DIVSD xmm0, xmm1\n";
-                    generator.pushInternalDblVar("xmm0");
                 } else if (generator.m_wasSecondLastPopDbl && generator.m_wasLastPopDbl) {
                     // Dbl / Dbl
                     generator.m_codeSectionAsmOutput << "    DIVSD xmm0, xmm1\n";
+                }
+
+                pushResult(shouldPushDbl);
+            }
+
+            void pushResult(const bool& shouldPushDbl) const {
+                if (shouldPushDbl) {
                     generator.pushInternalDblVar("xmm0");
+                } else {
+                    generator.pushInternalIntVar("rax");
                 }
             }
         };
@@ -391,8 +402,25 @@ public:
                 // TODO: The "std::holds_alternative" stuff below seems quite hacky, but oh well :D
                 TokenType tokenType = {};
                 size_t valueLength = 0;
-                if (std::holds_alternative<TermNode*>(letStmt->expr->var)) {
-                    auto term = std::get<TermNode*>(letStmt->expr->var);
+
+                std::string ident = letStmt->ident.value.value();
+                auto expr = letStmt->expr;
+
+                // If the statement is referring to another identifer, switch expression with the expression from that identifier.
+                // Needs to be done before following code, because the new expr might be a term or a bin expr.
+                if (std::holds_alternative<TermNode*>(expr->var)) {
+                    auto term = std::get<TermNode*>(expr->var);
+
+                    if (std::holds_alternative<IdentTermNode*>(term->var)) {
+                        auto identTerm = std::get<IdentTermNode*>(term->var);
+                        std::string ident = identTerm->ident.value.value();
+
+                        *expr = *generator.m_identExprNodes.at(ident);
+                    }
+                }
+
+                if (std::holds_alternative<TermNode*>(expr->var)) {
+                    auto term = std::get<TermNode*>(expr->var);
 
                     if (std::holds_alternative<StrLitTermNode*>(term->var)) {
                         tokenType = TokenType::str_lit;
@@ -407,17 +435,17 @@ public:
                     }
 
                     if (tokenType == TokenType::str_lit || tokenType == TokenType::dbl_lit) {
-                        generator.m_consts.insert({ letStmt->ident.value.value(), Const { .dataLoc = generator.m_dataSize, .type = tokenType, .valueLength = valueLength } });
+                        generator.m_consts.insert({ ident, Const { .dataLoc = generator.m_dataSize, .type = tokenType, .valueLength = valueLength } });
                     } else {
-                        generator.m_vars.insert({ letStmt->ident.value.value(), Var { .stackLoc = generator.m_stackSize, .type = tokenType } });
-                        generator.m_varsInOrder.push_back(letStmt->ident.value.value());
+                        generator.m_vars.insert({ ident, Var { .stackLoc = generator.m_stackSize, .type = tokenType } });
+                        generator.m_varsInOrder.push_back(ident);
                     }
 
-                    generator.generateExpr(letStmt->expr);
-                } else if (std::holds_alternative<BinExprNode*>(letStmt->expr->var)) {
+                    generator.generateExpr(expr);
+                } else if (std::holds_alternative<BinExprNode*>(expr->var)) {
                     const size_t identStackLoc = generator.m_stackSize;
 
-                    generator.generateExpr(letStmt->expr);
+                    generator.generateExpr(expr);
 
                     if (generator.m_werePushesDouble.back()) {
                         tokenType = TokenType::dbl_lit;
@@ -425,9 +453,11 @@ public:
                         tokenType = TokenType::int_lit;
                     }
 
-                    generator.m_vars.insert({ letStmt->ident.value.value(), Var { .stackLoc = identStackLoc, .type = tokenType } });
-                    generator.m_varsInOrder.push_back(letStmt->ident.value.value());
+                    generator.m_vars.insert({ ident, Var { .stackLoc = identStackLoc, .type = tokenType } });
+                    generator.m_varsInOrder.push_back(ident);
                 }
+
+                generator.m_identExprNodes.insert({ident, expr});
             }
 
             void operator()(const ScopeNode* scope) const {
@@ -641,6 +671,7 @@ private:
         m_stackSize++;
     }
 
+    // Returns <ident, isConst, token type>
     std::optional<std::tuple<std::string, bool, TokenType>> pop(const std::string& reg) {
         m_wasSecondLastPopDbl = m_wasLastPopDbl;
         m_wasLastPopDbl = false;
@@ -658,21 +689,21 @@ private:
         m_werePushesDouble.pop_back();
 
         if (m_constsOnStack.contains(m_stackSize)) {
-            std::string constName = m_constsOnStack.at(m_stackSize);
+            std::string ident = m_constsOnStack.at(m_stackSize);
             m_constsOnStack.erase(m_stackSize);
 
-            TokenType type = m_consts.at(constName).type;
+            TokenType type = m_consts.at(ident).type;
             m_wasLastPopDbl = type == TokenType::dbl_lit;
-            return std::make_tuple(constName, true, type);
+            return std::make_tuple(ident, true, type);
         }
 
         if (m_varsOnStack.contains(m_stackSize)) {
-            std::string varName = m_varsOnStack.at(m_stackSize);
+            std::string ident = m_varsOnStack.at(m_stackSize);
             m_varsOnStack.erase(m_stackSize);
 
-            TokenType type = m_vars.at(varName).type;
+            TokenType type = m_vars.at(ident).type;
             m_wasLastPopDbl = type == TokenType::dbl_lit;
-            return std::make_tuple(varName, false, type);
+            return std::make_tuple(ident, false, type);
         }
 
         return {};
@@ -1012,10 +1043,18 @@ private:
     bool m_wasLastPopDbl = false;
     bool m_wasSecondLastPopDbl = false;
     std::vector<bool> m_werePushesDouble {};
-    std::unordered_map<std::string, Var> m_vars {}; // var ident, var
-    std::map<size_t, std::string> m_varsOnStack {}; // stack loc, var ident
+    /** let ident => expr node*/
+    std::unordered_map<std::string, ExprNode*> m_identExprNodes {};
+    /** var ident => var */
+    std::unordered_map<std::string, Var> m_vars {};
+    /** stack loc => var ident */
+    std::map<size_t, std::string> m_varsOnStack {};
+    /** var ident ordered by insertion time (first was added first) */
     std::vector<std::string> m_varsInOrder {};
-    std::unordered_map<std::string, Const> m_consts {}; // const ident, const
-    std::unordered_map<size_t, std::string> m_constsOnStack = {}; // stack loc, const ident
-    std::vector<std::tuple<size_t, size_t, size_t>> m_scopes = {}; // count vars, count varsOnStack, stackSize at scope start
+    /** const ident => const */
+    std::unordered_map<std::string, Const> m_consts {};
+    /** stack loc => const ident */
+    std::unordered_map<size_t, std::string> m_constsOnStack = {};
+    /** values at scope start: <vars count, varsOnStack count, stackSize> */
+    std::vector<std::tuple<size_t, size_t, size_t>> m_scopes = {};
 };
