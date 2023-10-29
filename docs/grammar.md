@@ -4,7 +4,7 @@ $$
     [\text{Prog}] &\to [\text{Stmt}]^* \\
     [\text{Stmt}] &\to
         \begin{cases}
-            \text{let}\space\text{ident} = \text{[Expr]}; \\
+            \text{let}\space\text{ident} \text{ '=' } \text{[Expr]}; \\
             \text{[BuiltInFunc]} \ \text{'('} \ \text{[Expr]} \ \text{')'}; \\
             \text{if} \ \text{'('} \ \text{[Expr]} \ \text{')'} \ [\text{Scope}] \\
             \quad (\text{elseif} \ \text{'('} \ \text{[Expr]} \ \text{')'} \ [\text{Scope}])^* \\
@@ -34,20 +34,20 @@ $$
     \\
     [\text{SumBinExpr}] &\to
         \begin{cases}
-            [\text{Expr}] + [\text{Expr}] \\
-            [\text{Expr}] + [\text{MulBinExpr}] \\
-            [\text{Expr}] + [\text{DivBinExpr}] \\
+            [\text{Expr}] \text{ '+' } [\text{Expr}] \\
+            [\text{Expr}] \text{ '+' } [\text{MulBinExpr}] \\
+            [\text{Expr}] \text{ '+' } [\text{DivBinExpr}] \\
         \end{cases}
     \\
     [\text{SubBinExpr}] &\to
         \begin{cases}
-            [\text{Expr}] - [\text{Expr}] \\
-            [\text{Expr}] - [\text{MulBinExpr}] \\
-            [\text{Expr}] - [\text{DivBinExpr}] \\
+            [\text{Expr}] \text{ '-' } [\text{Expr}] \\
+            [\text{Expr}] \text{ '-' } [\text{MulBinExpr}] \\
+            [\text{Expr}] \text{ '-' } [\text{DivBinExpr}] \\
         \end{cases}
     \\
-    [\text{MulBinExpr}] &\to [\text{Expr}] * [\text{Expr}] \\
-    [\text{DivBinExpr}] &\to [\text{Expr}] / [\text{Expr}] \\
+    [\text{MulBinExpr}] &\to [\text{Expr}] \text{ '*' } [\text{Expr}] \\
+    [\text{DivBinExpr}] &\to [\text{Expr}] \text{ '/' } [\text{Expr}] \\
     [\text{BuiltInFunc}] &\to
         \begin{cases}
             \text{exit} & \text{Exit program with given exit code} \\

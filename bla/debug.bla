@@ -1,5 +1,3 @@
-let x = 1.0;
-let y = x;
-
-println(x);
-println(y);
+println(171.678); // TODO: Overflows??
+println("");
+println(9990.0004);

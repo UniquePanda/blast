@@ -1,4 +1,4 @@
-- fix left-to-right calculations (e.g. 3 - 2 - 1 currently produces 2 instead of 1)
+- fix the bug shown in "debug.bla"
 - +/- unary oeprators
 - reassign indentifiers
 - additional unary operations (e.g. !)
@@ -12,3 +12,4 @@
 
 done:
 - add line numbers to error messages
+- fix calculations with same operator precedence

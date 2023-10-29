@@ -201,7 +201,7 @@ public:
         auto specificBinExpr = m_allocator.alloc<T>();
         specificBinExpr->lhs = lhsExpr;
 
-        if (auto rhs = parseExpr(precedence)) {
+        if (auto rhs = parseExpr(precedence + 1)) {
             specificBinExpr->rhs = rhs.value();
             return specificBinExpr;
         } else {
@@ -211,24 +211,23 @@ public:
         return {};
     }
 
-    std::optional<BinExprNode*> parseBinExpr(TokenType tokenType, ExprNode *lhsExpr, size_t precedence) {
+    std::optional<BinExprNode*> parseBinExpr(Token *operatorToken, ExprNode *lhsExpr) {
         m_lastStmt = {};
 
-        consume();
         auto binExpr = m_allocator.alloc<BinExprNode>();
 
-        switch (tokenType) {
+        switch (operatorToken->type) {
             case TokenType::plus:
-                binExpr->var = parseSpecificBinExpr<SumBinExprNode>(lhsExpr, precedence);
+                binExpr->var = parseSpecificBinExpr<SumBinExprNode>(lhsExpr, operatorToken->precedence);
                 break;
             case TokenType::minus:
-                binExpr->var = parseSpecificBinExpr<SubBinExprNode>(lhsExpr, precedence);
+                binExpr->var = parseSpecificBinExpr<SubBinExprNode>(lhsExpr, operatorToken->precedence);
                 break;
             case TokenType::star:
-                binExpr->var = parseSpecificBinExpr<MulBinExprNode>(lhsExpr, precedence);
+                binExpr->var = parseSpecificBinExpr<MulBinExprNode>(lhsExpr, operatorToken->precedence);
                 break;
             case TokenType::slash:
-                binExpr->var = parseSpecificBinExpr<DivBinExprNode>(lhsExpr, precedence);
+                binExpr->var = parseSpecificBinExpr<DivBinExprNode>(lhsExpr, operatorToken->precedence);
                 break;
             default:
                 failUnsupportedBinaryOperator(m_lineNumber);
@@ -237,42 +236,43 @@ public:
         return binExpr;
     }
 
-    std::optional<ExprNode*> parseExpr(size_t precedence = 0) {
+    std::optional<ExprNode*> parseExpr(size_t minPrecedence = 0) {
         consumeLineBreaks();
 
-        m_lastStmt = {};
+        std::optional<TermNode*> lhsTerm = parseTerm();
 
-        if (!peek().has_value()) {
+        if (!lhsTerm.has_value()) {
             return {};
         }
 
-        if (precedence >= Token::MAX_PRECEDENCE) {
-            if (auto term = parseTerm()) {
-                auto expr = m_allocator.alloc<ExprNode>();
-                expr->var = term.value();
-                return expr;
-            } else {
-                return {};
-            }
-        }
+        consumeLineBreaks();
 
-        if (auto lhsExpr = parseExpr(precedence + 1)) {
+        auto expr = m_allocator.alloc<ExprNode>();
+        expr->var = lhsTerm.value();
+
+        while (true) {
+            std::optional<Token> currentToken = peek();
+
+            if (!peek().has_value()) {
+                break;
+            }
+
+            size_t operatorPrecedence = peek().value().precedence;
+            if (operatorPrecedence < minPrecedence || operatorPrecedence >= Token::MAX_PRECEDENCE) {
+                break;
+            }
+
+            Token operatorToken = consume();
+
             consumeLineBreaks();
 
-            if (peek().value().precedence != precedence) {
-                return lhsExpr;
-            }
-
-            if (auto binExpr = parseBinExpr(peek().value().type, lhsExpr.value(), precedence)) {
-                auto expr = m_allocator.alloc<ExprNode>();
-                expr->var = binExpr.value();
-                return expr;
-            }
-        } else {
-            return {};
+            auto exprCopy = m_allocator.alloc<ExprNode>();
+            exprCopy->var = expr->var;
+            auto binExpr = parseBinExpr(&operatorToken, exprCopy);
+            expr->var = binExpr.value();
         }
 
-        return {};
+        return expr;
     }
 
     std::optional<ScopeNode*> parseScope() {

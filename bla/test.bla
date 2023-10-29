@@ -5,7 +5,7 @@
 println("# Begin of test program (\"--\" marks end of each test)...");
 println("");
 
-println("# Performing number assignments and integer arithmetics, should be 180...");
+println("# Performing number assignments and integer arithmetics (180)...");
 let a = 4 + 2 * 3; // 10
 let b = a * 2 - 2; // 18
 let c = 2 * b / 2 + 2; // 20
@@ -14,7 +14,7 @@ let d = c * (2 + 2 * (2 + 1)); // 160
 println(d + c);
 println("--");
 
-println("# Performing more arithmetrics devided over multiple lines, printing without line break, should be 93...");
+println("# Performing more arithmetrics devided over multiple lines, printing without line break (93)...");
 let e
     =
     (
@@ -47,7 +47,7 @@ println("# Printing an empty string with linebreak...");
 println("");
 println("--");
 
-println("# Storing and printing result of integer divison (5 / 2 -> should be 2)...");
+println("# Storing and printing result of integer divison (5 / 2 -> 2)...");
 let f = 5 / 2;
 println(f);
 println("--");
@@ -136,6 +136,12 @@ print(" ");
 print(9990.0004);
 println("--");
 
+println("# Performing calculation with same operator precedences (1, 26, 36.7)...");
+println(7 - 5 - 1); // 1
+println(9 - 2 * 3 + 5 * 5 - 2); // 26
+println(3.0 * 2.5 - 2 + 10.4 * 3); // 36.7
+println("--");
+
 println("# Testing block scopes (3, 4, 3, 5, 3)...");
 let block1 = 3;
 println(3);
@@ -193,7 +199,7 @@ if (stringVal) {
 }
 println("--");
 
-println("# Print some negative numbers (-1, -4555, -336.76, -999999999999999.5)...");
+println("# Print some negative numbers (-1, -4555, -336.76)...");
 let t = 4000 - 8555;
 println(0 - 1);
 println(t);
