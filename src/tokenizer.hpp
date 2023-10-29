@@ -7,11 +7,8 @@
 #include "./utils.hpp"
 
 struct Token {
-    static const size_t MAX_PRECEDENCE = 2;
-
     TokenType type;
     std::optional<std::string> value {};
-    size_t precedence = MAX_PRECEDENCE;
 };
 
 const std::vector<std::string> BUILT_IN_FUNC_NAMES {"print", "println", "exit"};
@@ -146,13 +143,13 @@ public:
                 tokens.push_back({ .type = TokenType::semi });
                 consume();
             } else if (peek().value() == '+') {
-                tokens.push_back({ .type = TokenType::plus, .precedence = 0 });
+                tokens.push_back({ .type = TokenType::plus });
                 consume();
             } else if (peek().value() == '-') {
-                tokens.push_back({ .type = TokenType::minus, .precedence = 0 });
+                tokens.push_back({ .type = TokenType::minus });
                 consume();
             } else if (peek().value() == '*') {
-                tokens.push_back({ .type = TokenType::star, .precedence = 1 });
+                tokens.push_back({ .type = TokenType::star });
                 consume();
             } else if (peek().value() == '/') {
                 if (peek(1).value() == '/') {
@@ -177,7 +174,7 @@ public:
                         consume();
                     }
                 } else {
-                    tokens.push_back({ .type = TokenType::slash, .precedence = 1 });
+                    tokens.push_back({ .type = TokenType::slash });
                     consume();
                 }
             } else if (peek().value() == '\n') {

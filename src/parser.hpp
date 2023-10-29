@@ -195,7 +195,7 @@ public:
         }
     }
 
-    template <typename T> T* parseSpecificBinExpr(ExprNode *lhsExpr, size_t precedence) {
+    template <typename T> T* parseSpecificBinExpr(ExprNode *lhsExpr, int precedence) {
         m_lastStmt = {};
 
         auto specificBinExpr = m_allocator.alloc<T>();
@@ -218,16 +218,16 @@ public:
 
         switch (operatorToken->type) {
             case TokenType::plus:
-                binExpr->var = parseSpecificBinExpr<SumBinExprNode>(lhsExpr, operatorToken->precedence);
+                binExpr->var = parseSpecificBinExpr<SumBinExprNode>(lhsExpr, binaryOperatorPrecedence(operatorToken->type));
                 break;
             case TokenType::minus:
-                binExpr->var = parseSpecificBinExpr<SubBinExprNode>(lhsExpr, operatorToken->precedence);
+                binExpr->var = parseSpecificBinExpr<SubBinExprNode>(lhsExpr, binaryOperatorPrecedence(operatorToken->type));
                 break;
             case TokenType::star:
-                binExpr->var = parseSpecificBinExpr<MulBinExprNode>(lhsExpr, operatorToken->precedence);
+                binExpr->var = parseSpecificBinExpr<MulBinExprNode>(lhsExpr, binaryOperatorPrecedence(operatorToken->type));
                 break;
             case TokenType::slash:
-                binExpr->var = parseSpecificBinExpr<DivBinExprNode>(lhsExpr, operatorToken->precedence);
+                binExpr->var = parseSpecificBinExpr<DivBinExprNode>(lhsExpr, binaryOperatorPrecedence(operatorToken->type));
                 break;
             default:
                 failUnsupportedBinaryOperator(m_lineNumber);
@@ -236,7 +236,7 @@ public:
         return binExpr;
     }
 
-    std::optional<ExprNode*> parseExpr(size_t minPrecedence = 0) {
+    std::optional<ExprNode*> parseExpr(int minPrecedence = 0) {
         consumeLineBreaks();
 
         std::optional<TermNode*> lhsTerm = parseTerm();
@@ -257,8 +257,8 @@ public:
                 break;
             }
 
-            size_t operatorPrecedence = peek().value().precedence;
-            if (operatorPrecedence < minPrecedence || operatorPrecedence >= Token::MAX_PRECEDENCE) {
+            int operatorPrecedence = binaryOperatorPrecedence(peek().value().type);
+            if (operatorPrecedence < minPrecedence || operatorPrecedence >= MAX_PRECEDENCE) {
                 break;
             }
 
@@ -555,6 +555,8 @@ public:
     }
 
 private:
+    static const int MAX_PRECEDENCE = 2;
+
     [[nodiscard]] std::optional<Token> peek(int offset = 0) const {
         if (m_index + offset >= m_tokens.size()) {
             return {};
@@ -582,6 +584,21 @@ private:
         while (peek().value().type == TokenType::line_break) {
             m_lineNumber++;
             consume();
+        }
+    }
+
+    int binaryOperatorPrecedence(TokenType operatorType) {
+        switch (operatorType) {
+            case TokenType::plus:
+            case TokenType::minus:
+                return 0;
+
+            case TokenType::star:
+            case TokenType::slash:
+                return 1;
+
+            default:
+                return MAX_PRECEDENCE;
         }
     }
 
