@@ -571,7 +571,7 @@ public:
         }
 
         addIntToAsciiAsm();
-        addUnsignedDoubleToAsciiAsm();
+        addDoubleToAsciiAsm();
         addCharacterCountAsm();
         addMovBoolStrAsm();
         addSysWriteAsm();
@@ -837,7 +837,7 @@ private:
     *     rdx (contains number of chars)
     * Clobbers rsi, rax, rbx, rcx, rdx, r8, xmm0, xmm1, xmm2
     */
-    void addUnsignedDoubleToAsciiAsm() {
+    void addDoubleToAsciiAsm() {
         // reference: https://stackoverflow.com/a/46301894
         m_codeSectionAsmOutput << "dtoa:\n";
 
@@ -850,6 +850,7 @@ private:
         // Negate value if it is negative to make sure we print the correct number
         m_codeSectionAsmOutput << "    xor r8, r8\n";
         m_codeSectionAsmOutput << "    movmskpd r8, xmm0\n"; // Extract sign bits into r8
+        m_codeSectionAsmOutput << "    and r8, 0x1\n"; // We only care for the lowest bit
         m_codeSectionAsmOutput << "    test r8, r8\n"; // If r8 is not 0 then number in xmm0 is negative
         m_codeSectionAsmOutput << "    jz .dtoaNotNegative\n";
         m_codeSectionAsmOutput << "    movq xmm1, [FLIP_S_64B]\n";

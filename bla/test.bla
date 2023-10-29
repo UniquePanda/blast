@@ -200,7 +200,7 @@ if (stringVal) {
 }
 println("--");
 
-println("# Print some negative numbers (-1, -4555, -336.76)...");
+println("# Print some negative numbers by subtracting below zero (-1, -4555, -336.76)...");
 let t = 4000 - 8555;
 println(0 - 1);
 println(t);

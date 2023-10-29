@@ -1,3 +1,0 @@
-println(171.678); // TODO: Overflows??
-println("");
-println(9990.0004);

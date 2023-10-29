@@ -1,5 +1,4 @@
-- fix the bug shown in "debug.bla"
-- +/- unary oeprators
+- +/- unary operators
 - reassign indentifiers
 - additional unary operations (e.g. !)
 - while loops
