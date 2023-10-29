@@ -43,7 +43,8 @@ println("# Directly printing a string without linebreak...");
 print("an inline string");
 println("--");
 
-println("# Printing an empty string with linebreak...");
+println("# Printing an empty string without and with linebreak...");
+print("");
 println("");
 println("--");
 

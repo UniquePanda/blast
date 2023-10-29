@@ -380,7 +380,7 @@ public:
                         generator.m_codeSectionAsmOutput << "    add rsp, rdx\n";
                     }
 
-                    if (isConst) {
+                    if (builtInFuncStmt->funcName == "println" && isConst) {
                         // Restore value before our string
                         generator.m_codeSectionAsmOutput << "    dec edx\n";
                         generator.m_codeSectionAsmOutput << "    add rsi, rdx\n";
