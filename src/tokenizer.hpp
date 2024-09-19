@@ -6,11 +6,6 @@
 
 #include "./utils.hpp"
 
-struct Token {
-    TokenType type;
-    std::optional<std::string> value {};
-};
-
 const std::vector<std::string> BUILT_IN_FUNC_NAMES {"print", "println", "exit"};
 
 class Tokenizer {
@@ -148,6 +143,13 @@ public:
             } else if (peek().value() == '-') {
                 tokens.push_back({ .type = TokenType::minus });
                 consume();
+
+                // If the minus is followed by a parenthesis we change it to a "-1 *" to avoid having to handle the "-("
+                // expression later on.
+                if (peek().value() == '(') {
+                    tokens.push_back({ .type = TokenType::int_lit, .value = "1" });
+                    tokens.push_back({ .type = TokenType::star });
+                }
             } else if (peek().value() == '*') {
                 tokens.push_back({ .type = TokenType::star });
                 consume();

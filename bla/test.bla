@@ -207,4 +207,42 @@ println(t);
 println((0 - 673.52) / 2.0);
 println("--");
 
+println("# Print some negative numbers by adding '-' in front (-1, -999, -123.45, -0.007)...");
+println(-1);
+println(-999);
+println(-123.45);
+println(-0.007);
+println("--");
+
+println("# Convert some booleans by prepending them with '-' and '+' (0, 0, -1, 1)...");
+println(-false);
+println(+false);
+println(-true);
+println(+true);
+println("--");
+
+println("# Perform some arithmetic operations that involve negative number with doubles and ints (-99, -49.5, -1112.0, 1112.0, 123, 24, -0.0, -123.0, -6.0, 30.0)...");
+let u = 33 * -3;
+println(u);
+println(u / 2.0);
+
+let v = -111.2 * 10;
+println(v);
+println(v * -1);
+
+let w = -1 * -123;
+println(w);
+println(w + u);
+
+let x = 0 * -12.5;
+println(x);
+println(x - w);
+
+let y = 0.5 * -12;
+println(y);
+
+let z = -0.75 * -40;
+println(z);
+println("--");
+
 println("# Test program finished!");
