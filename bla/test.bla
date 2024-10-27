@@ -222,7 +222,7 @@ println(+true);
 println("--");
 
 println("# Perform some arithmetic operations that involve negative number with doubles and ints (-99, -49.5, -1112.0, 1112.0, 123, 24, -0.0, -123.0, -6.0, 30.0)...");
-let u = 33 * -3;
+let u = (33 * -3); // Parenthesis added because there was a bug where such parenthesis broke the code generation.
 println(u);
 println(u / 2.0);
 

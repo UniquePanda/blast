@@ -5,6 +5,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <map>
+#include <variant>
 
 #include "utils.hpp"
 #include "parser.hpp"
@@ -499,7 +500,26 @@ public:
                     }
                 }
 
-                if (std::holds_alternative<TermNode*>(expr->var) || std::holds_alternative<UnExprNode*>(expr->var)) {
+                bool isTermNode = std::holds_alternative<TermNode*>(expr->var);
+                bool isUnExprNode = std::holds_alternative<UnExprNode*>(expr->var);
+
+                // If the expr holds a ParenTerm (e.g. "let x = (1 + 2)"), we need to extract the expression from
+                // within the parenthesis and use that instead. The parenthesis do not have any real purpose in such
+                // a situation so it's not a problem to simply ignore them.
+                // As the parser is already replacing `-(...)` with `-1 * (...)` we don't have to care about unary expression.
+                if (isTermNode) {
+                    TermNode* term = std::get<TermNode*>(expr->var);
+
+                    if (std::holds_alternative<ParenTermNode*>(term->var)) {
+                        ParenTermNode* parenTerm = std::get<ParenTermNode*>(term->var);
+                        expr = parenTerm->expr;
+
+                        isTermNode = std::holds_alternative<TermNode*>(expr->var);
+                        isUnExprNode = std::holds_alternative<UnExprNode*>(expr->var);
+                    }
+                }
+
+                if (isTermNode || isUnExprNode) {
                     TermNode* term;
                     std::vector<Token> unaryOperators = {};
 
