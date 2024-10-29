@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cassert>
 #include <iomanip>
 #include <sstream>
@@ -27,13 +28,12 @@ public:
 
             void operator()(const DblLitTermNode* dblLitTerm) const {
                 std::string valueString = negUnOperatorCondensed(unaryOperators) + dblLitTerm->dbl_lit.value.value();
-                auto dataLoc = addDoubleToDataSection(std::stod(valueString));
+                auto dataLoc = generator.addDoubleToDataSection(std::stod(valueString));
 
                 generator.m_codeSectionAsmOutput << "    mov rax, dbl" << dataLoc << "\n";
                 generator.pushConst(
                     "rax",
                     generator.internalConstIdent(dataLoc, "DBL"),
-                    false,
                     TokenType::dbl_lit,
                     dataLoc,
                     valueString
@@ -51,7 +51,6 @@ public:
                 generator.pushConst(
                     "rax",
                     generator.internalConstIdent(dataLoc, "STRING"),
-                    false,
                     TokenType::str_lit,
                     dataLoc,
                     strLitTerm->str_lit.value.value()
@@ -101,20 +100,19 @@ public:
                     if (cons.type == TokenType::dbl_lit && negUnOperatorCondensed(unaryOperators) == "-") {
                         // Store negated value of the double.
                         std::string valueString = "-" + generator.m_consts.at(identName).valueAtDataLoc;
-                        auto dataLoc = addDoubleToDataSection(std::stod(valueString));
+                        auto dataLoc = generator.addDoubleToDataSection(std::stod(valueString));
 
                         generator.m_codeSectionAsmOutput << "    mov rax, dbl" << dataLoc << "\n";
                         generator.pushConst(
                             "rax",
                             generator.internalConstIdent(dataLoc, "DBL"),
-                            false,
                             TokenType::dbl_lit,
                             dataLoc,
                             valueString
                         );
                     } else {
                         generator.m_codeSectionAsmOutput << "    mov rax, " << typeIdent << cons.dataLoc << "\n";
-                        generator.pushConst("rax", identName, true);
+                        generator.pushConst("rax", identName);
                     }
                 } else {
                     const auto& var = generator.m_vars.at(identName);
@@ -153,7 +151,7 @@ public:
                         generator.m_codeSectionAsmOutput << "    mov rax, " << stackLocation.str() << "\n";
                         generator.pushInternalIntVar("rax");
                     } else {
-                        generator.pushVar(stackLocation.str(), identName, true, var.type);
+                        generator.pushVar(stackLocation.str(), identName, var.type);
                     }
                 }
             }
@@ -181,14 +179,6 @@ public:
                     }
                 }
                 generator.m_dataSectionAsmOutput << ", 0\n";
-                generator.m_dataSize++;
-
-                return generator.m_dataSize - 1;
-            }
-
-            size_t addDoubleToDataSection(double dbl) const {
-                generator.m_dataSectionAsmOutput << "    dbl" << generator.m_dataSize << " dq "
-                    << std::setprecision(15) << std::fixed << dbl << "\n";
                 generator.m_dataSize++;
 
                 return generator.m_dataSize - 1;
@@ -479,101 +469,24 @@ public:
                     failAlreadyUsedIdentifer(letStmt->ident.value.value(), generator.m_lineNumber);
                 }
 
-                // TODO: The "std::holds_alternative" stuff below seems quite hacky, but oh well :D
-                TokenType tokenType = {};
-                size_t valueLength = 0;
-                std::string constValue = "";
-
                 std::string ident = letStmt->ident.value.value();
                 auto expr = letStmt->expr;
 
-                // If the statement is referring to another identifer, switch expression with the expression from that identifier.
-                // Needs to be done before following code, because the new expr might be a term or a bin expr.
-                if (std::holds_alternative<TermNode*>(expr->var)) {
-                    auto term = std::get<TermNode*>(expr->var);
+                generator.assignment(ident, expr);
+            }
 
-                    if (std::holds_alternative<IdentTermNode*>(term->var)) {
-                        auto identTerm = std::get<IdentTermNode*>(term->var);
-                        std::string ident = identTerm->ident.value.value();
-
-                        *expr = *generator.m_identExprNodes.at(ident);
-                    }
+            void operator()(const ReassignStmtNode* reassignStmt) const {
+                if (
+                    !generator.m_vars.contains(reassignStmt->ident.value.value())
+                    && !generator.m_consts.contains(reassignStmt->ident.value.value())
+                ) {
+                    failUndeclaredIdentifer(reassignStmt->ident.value.value(), generator.m_lineNumber);
                 }
 
-                bool isTermNode = std::holds_alternative<TermNode*>(expr->var);
-                bool isUnExprNode = std::holds_alternative<UnExprNode*>(expr->var);
+                std::string ident = reassignStmt->ident.value.value();
+                auto expr = reassignStmt->expr;
 
-                // If the expr holds a ParenTerm (e.g. "let x = (1 + 2)"), we need to extract the expression from
-                // within the parenthesis and use that instead. The parenthesis do not have any real purpose in such
-                // a situation so it's not a problem to simply ignore them.
-                // As the parser is already replacing `-(...)` with `-1 * (...)` we don't have to care about unary expression.
-                if (isTermNode) {
-                    TermNode* term = std::get<TermNode*>(expr->var);
-
-                    if (std::holds_alternative<ParenTermNode*>(term->var)) {
-                        ParenTermNode* parenTerm = std::get<ParenTermNode*>(term->var);
-                        expr = parenTerm->expr;
-
-                        isTermNode = std::holds_alternative<TermNode*>(expr->var);
-                        isUnExprNode = std::holds_alternative<UnExprNode*>(expr->var);
-                    }
-                }
-
-                if (isTermNode || isUnExprNode) {
-                    TermNode* term;
-                    std::vector<Token> unaryOperators = {};
-
-                    if (std::holds_alternative<TermNode*>(expr->var)) {
-                        term = std::get<TermNode*>(expr->var);
-                    } else {
-                        auto unExpr = std::get<UnExprNode*>(expr->var);
-                        term = unExpr->term;
-                        unaryOperators = unExpr->operators;
-                    }
-
-                    if (std::holds_alternative<StrLitTermNode*>(term->var)) {
-                        if (unaryOperators.size() > 0) {
-                            failUexpectedUnaryOperator(unOpSymbol(unaryOperators.back().type), generator.m_lineNumber);
-                        }
-
-                        tokenType = TokenType::str_lit;
-                        constValue = std::get<StrLitTermNode*>(term->var)->str_lit.value.value();
-                        valueLength = constValue.length();
-                    } else if (std::holds_alternative<BoolLitTermNode*>(term->var)) {
-                        tokenType = TokenType::bool_lit;
-                    } else if (std::holds_alternative<IntLitTermNode*>(term->var)) {
-                        tokenType = TokenType::int_lit;
-                    } else if (std::holds_alternative<DblLitTermNode*>(term->var)) {
-                        tokenType = TokenType::dbl_lit;
-                        std::string negUnCondensed = negUnOperatorCondensed(unaryOperators);
-                        constValue = negUnCondensed + std::get<DblLitTermNode*>(term->var)->dbl_lit.value.value();
-                        valueLength = constValue.length();
-                    }
-
-                    if (tokenType == TokenType::str_lit || tokenType == TokenType::dbl_lit) {
-                        generator.m_consts.insert({ ident, Const { .dataLoc = generator.m_dataSize, .valueAtDataLoc = constValue, .type = tokenType, .valueLength = valueLength } });
-                    } else {
-                        generator.m_vars.insert({ ident, Var { .stackLoc = generator.m_stackSize, .type = tokenType } });
-                        generator.m_varsInOrder.push_back(ident);
-                    }
-
-                    generator.generateExpr(expr);
-                } else if (std::holds_alternative<BinExprNode*>(expr->var)) {
-                    const size_t identStackLoc = generator.m_stackSize;
-
-                    generator.generateExpr(expr);
-
-                    if (generator.m_werePushesDouble.back()) {
-                        tokenType = TokenType::dbl_lit;
-                    } else {
-                        tokenType = TokenType::int_lit;
-                    }
-
-                    generator.m_vars.insert({ ident, Var { .stackLoc = identStackLoc, .type = tokenType } });
-                    generator.m_varsInOrder.push_back(ident);
-                }
-
-                generator.m_identExprNodes.insert({ident, expr});
+                generator.assignment(ident, expr);
             }
 
             void operator()(const ScopeNode* scope) const {
@@ -701,12 +614,11 @@ private:
     void pushVar(
         const std::string& regOrValue,
         const std::string& identName = "",
-        const bool& doesAlreadyExists = false,
         const TokenType& type = {},
         const bool& shouldIncreaseStackSize = true
     ) {
         if (shouldIncreaseStackSize) {
-            if (!doesAlreadyExists) {
+            if (!m_vars.contains(identName)) {
                 m_vars.insert({ identName, Var {.stackLoc = m_stackSize, .type = type}});
                 m_varsInOrder.push_back(identName);
             }
@@ -729,7 +641,6 @@ private:
         pushVar(
             regOrValue,
             "<VAR_BOOL_" + label + ">",
-            false,
             TokenType::bool_lit,
             shouldIncreaseStackSize
         );
@@ -739,7 +650,6 @@ private:
         pushVar(
             regOrValue,
             internalVarIdent("INT"),
-            false,
             TokenType::int_lit,
             shouldIncreaseStackSize
         );
@@ -749,7 +659,6 @@ private:
         pushVar(
             regOrValue,
             internalVarIdent("BOOL"),
-            false,
             TokenType::bool_lit,
             shouldIncreaseStackSize
         );
@@ -759,7 +668,6 @@ private:
         pushVar(
             regOrValue,
             internalVarIdent("DBL"),
-            false,
             TokenType::dbl_lit,
             shouldIncreaseStackSize
         );
@@ -768,14 +676,13 @@ private:
     void pushConst(
         const std::string& reg,
         const std::string& identName = "",
-        const bool& alreadyExists = false,
         const TokenType& type = {},
         const size_t& dataLoc = 0,
         const std::string& valueAtDataLoc = ""
     ) {
         m_werePushesDouble.push_back(false); // Pushing a double const to stack means pushing its memory address, so the pushed value itself is not a double.
 
-        if (!alreadyExists) {
+        if (!m_consts.contains(identName)) {
             m_consts.insert({ identName, Const { .dataLoc = dataLoc, .valueAtDataLoc = valueAtDataLoc, .type = type, .valueLength = valueAtDataLoc.length() } });
         }
 
@@ -862,6 +769,14 @@ private:
         return "<CONST_" + additional + std::to_string(dataLoc) + ">";
     }
 
+    size_t addDoubleToDataSection(double dbl) {
+        m_dataSectionAsmOutput << "    dbl" << m_dataSize << " dq "
+            << std::setprecision(15) << std::fixed << dbl << "\n";
+        m_dataSize++;
+
+        return m_dataSize - 1;
+    }
+
     void beginScope() {
         m_scopes.push_back(std::make_tuple(m_vars.size(), m_varsOnStack.size(), m_stackSize));
     }
@@ -891,6 +806,181 @@ private:
 
     std::string getLabelName() {
         return ".label" + std::to_string(m_labelCount++);
+    }
+
+    void assignment(std::string ident, ExprNode* expr) {
+        TokenType tokenType = {};
+
+        bool isTermNode = std::holds_alternative<TermNode*>(expr->var);
+        bool isUnExprNode = std::holds_alternative<UnExprNode*>(expr->var);
+        bool isBinExprNode = std::holds_alternative<BinExprNode*>(expr->var);
+
+        if (!(isTermNode || isUnExprNode || isBinExprNode)) {
+            failInvalidStmt(m_lineNumber);
+        }
+
+        if (isBinExprNode) {
+            const size_t identStackLoc = m_stackSize;
+
+            generateExpr(expr);
+
+            if (m_werePushesDouble.back()) {
+                tokenType = TokenType::dbl_lit;
+            } else {
+                tokenType = TokenType::int_lit;
+            }
+
+            m_vars.insert_or_assign(ident, Var { .stackLoc = identStackLoc, .type = tokenType });
+            addToOrderedVarsIfNew(ident);
+
+            return;
+        }
+
+        TermNode* term;
+        std::vector<Token> unaryOperators = {};
+
+        if (std::holds_alternative<TermNode*>(expr->var)) {
+            term = std::get<TermNode*>(expr->var);
+
+            // If the expr holds a ParenTerm (e.g. "let x = (1 + 2)"), we need to extract the expression from
+            // within the parenthesis and use that instead. The parenthesis do not have any real purpose in such
+            // a situation so it's not a problem to simply ignore them.
+            // As the parser is already replacing `-(...)` with `-1 * (...)` we don't have to care about unary expression.
+            if (std::holds_alternative<ParenTermNode*>(term->var)) {
+                ParenTermNode* parenTerm = std::get<ParenTermNode*>(term->var);
+                assignment(ident, parenTerm->expr);
+                return;
+            }
+        } else {
+            auto unExpr = std::get<UnExprNode*>(expr->var);
+            term = unExpr->term;
+            unaryOperators = unExpr->operators;
+        }
+
+        // If the term is referencing another identifier, we need to copy what the other identifier is pointing to
+        // and then let the new identifier point to that copy.
+        // todo: that's basically the same code as in `generateTerm` for an `IdentTermNode`.
+        if (std::holds_alternative<IdentTermNode*>(term->var)) {
+            auto origIdentTerm = std::get<IdentTermNode*>(term->var);
+            auto origIdent = origIdentTerm->ident.value.value();
+            bool isConst = m_consts.contains(origIdent);
+
+            if (!isConst && !m_vars.contains(origIdent)) {
+                failUndeclaredIdentifer(origIdent, m_lineNumber);
+            }
+
+            if (isConst) {
+                const auto& cons = m_consts.at(origIdent);
+                std::string typeIdent = "";
+                if (cons.type == TokenType::str_lit) {
+                    if (unaryOperators.size() > 0) {
+                        failUexpectedUnaryOperator(unOpSymbol(unaryOperators.back().type), m_lineNumber);
+                    }
+
+                    typeIdent = "string";
+                } else if (cons.type == TokenType::dbl_lit) {
+                    typeIdent = "dbl";
+                }
+
+                m_consts.erase(ident);
+
+                if (cons.type == TokenType::dbl_lit && negUnOperatorCondensed(unaryOperators) == "-") {
+                    // Store negated value of the double.
+                    std::string valueString = "-" + m_consts.at(origIdent).valueAtDataLoc;
+                    auto dataLoc = addDoubleToDataSection(std::stod(valueString));
+
+                    m_codeSectionAsmOutput << "    mov rax, dbl" << dataLoc << "\n";
+                    pushConst(
+                        "rax",
+                        internalConstIdent(dataLoc, "DBL"),
+                        TokenType::dbl_lit,
+                        dataLoc,
+                        valueString
+                    );
+                } else {
+                    m_codeSectionAsmOutput << "    mov rax, " << typeIdent << cons.dataLoc << "\n";
+                    pushConst("rax", ident, cons.type, cons.dataLoc, cons.valueAtDataLoc);
+                }
+            } else {
+                const auto& var = m_vars.at(origIdent);
+
+                if (var.type == TokenType::str_lit && unaryOperators.size() > 0) {
+                    failUexpectedUnaryOperator(unOpSymbol(unaryOperators.back().type), m_lineNumber);
+                }
+
+                bool hasUnPlusMinus = false;
+                for (Token unOperator : unaryOperators) {
+                    if (unOperator.type == TokenType::plus || unOperator.type == TokenType::minus) {
+                        hasUnPlusMinus = true;
+                        break;
+                    }
+                }
+
+                bool isNegated = negUnOperatorCondensed(unaryOperators) == "-";
+
+                std::stringstream stackLocation;
+                stackLocation << "QWORD [rsp + " << (m_stackSize - var.stackLoc - 1) * 8 << "]";
+
+                if (isNegated) {
+                    if (var.type == TokenType::int_lit || var.type == TokenType::bool_lit) {
+                        m_codeSectionAsmOutput << "    mov rax, " << stackLocation.str() << "\n";
+                        m_codeSectionAsmOutput << "    neg rax" << "\n";
+                        pushInternalIntVar("rax");
+                    } else if (var.type == TokenType::dbl_lit) {
+                        m_codeSectionAsmOutput << "    movq xmm0, " << stackLocation.str() << "\n";
+                        m_codeSectionAsmOutput << "    movq xmm1, [FLIP_S_64B]\n";
+                        m_codeSectionAsmOutput << "    xorps xmm0, xmm1\n";
+                        pushInternalDblVar("xmm0");
+                    } else {
+                        failUexpectedUnaryOperator(unOpSymbol(unaryOperators.back().type), m_lineNumber);
+                    }
+                } else if (hasUnPlusMinus && var.type == TokenType::bool_lit) {
+                    m_codeSectionAsmOutput << "    mov rax, " << stackLocation.str() << "\n";
+                    pushInternalIntVar("rax");
+                } else {
+                    pushVar(stackLocation.str(), ident, var.type);
+                }
+            }
+
+            return;
+        }
+
+        size_t valueLength = 0;
+        std::string constValue = "";
+        if (std::holds_alternative<StrLitTermNode*>(term->var)) {
+            if (unaryOperators.size() > 0) {
+                failUexpectedUnaryOperator(unOpSymbol(unaryOperators.back().type), m_lineNumber);
+            }
+
+            tokenType = TokenType::str_lit;
+            constValue = std::get<StrLitTermNode*>(term->var)->str_lit.value.value();
+            valueLength = constValue.length();
+        } else if (std::holds_alternative<BoolLitTermNode*>(term->var)) {
+            tokenType = TokenType::bool_lit;
+        } else if (std::holds_alternative<IntLitTermNode*>(term->var)) {
+            tokenType = TokenType::int_lit;
+        } else if (std::holds_alternative<DblLitTermNode*>(term->var)) {
+            tokenType = TokenType::dbl_lit;
+            std::string negUnCondensed = negUnOperatorCondensed(unaryOperators);
+            constValue = negUnCondensed + std::get<DblLitTermNode*>(term->var)->dbl_lit.value.value();
+            valueLength = constValue.length();
+        }
+
+        if (tokenType == TokenType::str_lit || tokenType == TokenType::dbl_lit) {
+            m_consts.insert_or_assign(ident, Const { .dataLoc = m_dataSize, .valueAtDataLoc = constValue, .type = tokenType, .valueLength = valueLength });
+        } else {
+            m_vars.insert_or_assign(ident, Var { .stackLoc = m_stackSize, .type = tokenType });
+            addToOrderedVarsIfNew(ident);
+        }
+
+        generateExpr(expr);
+    }
+
+    void addToOrderedVarsIfNew(std::string ident) {
+        // Only add to m_varsInOrder if not already part of it.
+        if (std::find(m_varsInOrder.begin(), m_varsInOrder.end(), ident) == std::end(m_varsInOrder)) {
+            m_varsInOrder.push_back(ident);
+        }
     }
 
     /*
@@ -1159,8 +1249,6 @@ private:
     bool m_wasLastPopDbl = false;
     bool m_wasSecondLastPopDbl = false;
     std::vector<bool> m_werePushesDouble {};
-    /** let ident => expr node*/
-    std::unordered_map<std::string, ExprNode*> m_identExprNodes {};
     /** var ident => var */
     std::unordered_map<std::string, Var> m_vars {};
     /** stack loc => var ident */

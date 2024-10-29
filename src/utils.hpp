@@ -6,7 +6,7 @@
 
 enum class TokenType {
     unknown, line_break,
-    let, ident, int_lit, dbl_lit, str_lit, bool_lit,
+    let, reassign, ident, int_lit, dbl_lit, str_lit, bool_lit,
     built_in_func, if_, elseif, else_,
     eq, open_paren, close_paren, open_curly, close_curly, semi, quot,
     plus, minus, star, slash
