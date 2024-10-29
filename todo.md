@@ -1,5 +1,7 @@
+# doing:
+
 # basic todos:
-- reassign indentifiers
+- pointers
 - additional unary operations (e.g. !)
 - while loops
 - for loops
@@ -7,6 +9,7 @@
 - functions
 - objects/structs
 - classes
+- add typing?
 - optimizer for produced asm
 
 # specific ideas/bugs/refactorings/etc:
@@ -19,3 +22,4 @@
 - add line numbers to error messages
 - fix calculations with same operator precedence
 - +/- unary operators
+- reassign indentifiers

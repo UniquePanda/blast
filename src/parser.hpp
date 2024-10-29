@@ -84,6 +84,11 @@ struct LetStmtNode {
     ExprNode* expr;
 };
 
+struct ReassignStmtNode {
+    Token ident;
+    ExprNode* expr;
+};
+
 struct ScopeNode {
     std::vector<StmtNode*> stmts;
 };
@@ -103,7 +108,7 @@ struct ElseStmtNode {
 };
 
 struct StmtNode {
-    std::variant<BuiltInFuncStmtNode*, LetStmtNode*, ScopeNode*, IfStmtNode*, ElseIfStmtNode*, ElseStmtNode*> var;
+    std::variant<BuiltInFuncStmtNode*, LetStmtNode*, ReassignStmtNode*, ScopeNode*, IfStmtNode*, ElseIfStmtNode*, ElseStmtNode*> var;
     size_t lineNumber = 0;
 };
 
@@ -434,6 +439,44 @@ public:
             stmt->var = letStmt;
 
             m_idents.insert(letStmt->ident.value.value());
+
+            return stmt;
+        } else if (peek().value().type == TokenType::ident) {
+            if (!peek(1).has_value()) {
+                failUnexpectedEOF(m_lineNumber);
+            }
+
+            // ident
+            auto reassignStmt = m_allocator.alloc<ReassignStmtNode>();
+            reassignStmt->ident = consume();
+
+            if (!m_idents.contains(reassignStmt->ident.value.value())) {
+                failUndeclaredIdentifer(reassignStmt->ident.value.value(), m_lineNumber);
+            }
+
+            consumeLineBreaks();
+
+            if (peek().value().type != TokenType::eq) {
+                failMissingOperator("Reassignment without equal sign", m_lineNumber);
+            }
+
+            // equal sign
+            consume();
+
+            consumeLineBreaks();
+
+            if (auto expr = parseExpr()) {
+                reassignStmt->expr = expr.value();
+            } else {
+                failInvalidExpr("Unknown expression as value in reassignment statement", m_lineNumber);
+            }
+
+            consumeSemi();
+
+            m_lastStmt = TokenType::reassign;
+
+            auto stmt = m_allocator.alloc<StmtNode>();
+            stmt->var = reassignStmt;
 
             return stmt;
         } else if (peek().value().type == TokenType::open_curly) {

@@ -1,12 +1,13 @@
 #pragma once
 
+#include <cstddef>
 #include <iostream>
 #include <string>
 #include <optional>
 
 enum class TokenType {
     unknown, line_break,
-    let, ident, int_lit, dbl_lit, str_lit, bool_lit,
+    let, reassign, ident, int_lit, dbl_lit, str_lit, bool_lit,
     built_in_func, if_, elseif, else_,
     eq, open_paren, close_paren, open_curly, close_curly, semi, quot,
     plus, minus, star, slash
@@ -41,6 +42,61 @@ std::string unOpSymbol(TokenType unaryOperatorType) {
     }
 }
 
+std::string tokenTypeName(TokenType tokenType) {
+    switch (tokenType) {
+        case TokenType::unknown:
+            return "Unknown";
+        case TokenType::line_break:
+            return "Line Break";
+        case TokenType::let:
+            return "Let";
+        case TokenType::reassign:
+            return "Reassign";
+        case TokenType::ident:
+            return "Identifier";
+        case TokenType::int_lit:
+            return "Integer";
+        case TokenType::dbl_lit:
+            return "Double";
+        case TokenType::str_lit:
+            return "String";
+        case TokenType::bool_lit:
+            return "Boolean";
+        case TokenType::built_in_func:
+            return "Built-in Function";
+        case TokenType::if_:
+            return "If";
+        case TokenType::elseif:
+            return "Else-If";
+        case TokenType::else_:
+            return "Else";
+        case TokenType::eq:
+            return "Equals";
+        case TokenType::open_paren:
+            return "Opening Parenthesis";
+        case TokenType::close_paren:
+            return "Closing Parenthesis";
+        case TokenType::open_curly:
+            return "Opening Curly Brace";
+        case TokenType::close_curly:
+            return "Closing Curly Brace";
+        case TokenType::semi:
+            return "Semicolon";
+        case TokenType::quot:
+            return "Quotation Mark";
+        case TokenType::plus:
+            return "Plus";
+        case TokenType::minus:
+            return "Minus";
+        case TokenType::star:
+            return "Star";
+        case TokenType::slash:
+            return "Slash";
+    }
+
+    return "Unknown";
+}
+
 void fail(const std::string& msg, const size_t& lineNumber) {
     std::cerr << "Line " << lineNumber << ": " << msg << std::endl;
     exit(EXIT_FAILURE);
@@ -64,6 +120,10 @@ void failUnexpectedEOF(const size_t& lineNumber) {
 
 void failInvalidStmt(const size_t& lineNumber) {
     fail("Invalid statement", lineNumber);
+}
+
+void failInvalidReassignment(const std::string& expectedType, const size_t& lineNumber) {
+    fail("Invalid reassignment. Expected data type: " + expectedType, lineNumber);
 }
 
 void failInvalidScope(const size_t& lineNumber) {

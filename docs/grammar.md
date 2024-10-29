@@ -5,6 +5,7 @@ $$
     [\text{Stmt}] &\to
         \begin{cases}
             \text{let}\space\text{ident} \text{ '=' } \text{[Expr]}; \\
+            \text{ident} \text{ '=' } \text{[Expr]}; \\
             \text{[BuiltInFunc]} \ \text{'('} \ \text{[Expr]} \ \text{')'}; \\
             \text{if} \ \text{'('} \ \text{[Expr]} \ \text{')'} \ [\text{Scope}] \\
             \quad (\text{elseif} \ \text{'('} \ \text{[Expr]} \ \text{')'} \ [\text{Scope}])^* \\

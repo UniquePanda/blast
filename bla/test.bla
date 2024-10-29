@@ -32,7 +32,7 @@ print(
 );
 println("--")
 
-// Semi colon can also be on a different line.
+// Semicolon can also be on a different line.
 ;
 
 println("# Printing 12 with line break...");
@@ -243,6 +243,26 @@ println(y);
 
 let z = -0.75 * -40;
 println(z);
+println("--");
+
+println("# Reassign identifiers (1, 2.5, 'abc', false)...");
+let a1 = 5;
+a1 = 1;
+println(a1);
+
+let b1 = 3 * 3;
+b1 = 5 / 2.0;
+println(b1);
+
+let c1 = "xyz";
+c1 = "abc";
+let c2 = "zzz";
+c2 = c1;
+println(c2);
+
+let d1 = true;
+d1 = false;
+println(d1);
 println("--");
 
 println("# Test program finished!");
