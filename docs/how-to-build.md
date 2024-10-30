@@ -3,8 +3,8 @@
 - `cmake ..`
 - `make`
 
-# Compile a bla program with the compiler (from wihtin `build` directory)
-- `./bla <path to bla file>` (e.g. `.bla ../bla/debug.bla`)
+# Compile a Blast program with the compiler (from within `build` directory)
+- `./blast <path to bla file>` (e.g. `.blast ../bla/debug.bla`)
 
-# Run the compiled bla file (from within `build` directory)
-- `../blaOut/out`
+# Run the compiled Blast file (from within `build` directory)
+- `../blastOut/out`

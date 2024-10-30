@@ -41,13 +41,13 @@ int main(int argc, char const* argv[]) {
     Generator generator(tree.value());
 
     {
-        std::fstream file("../blaOut/out.asm", std::ios::out);
+        std::fstream file("../blastOut/out.asm", std::ios::out);
         file << generator.generateProg();
         std::cout << "      Generation successful" << std::endl;
         file.close();
 
-        system("nasm -felf64 ../blaOut/out.asm");
-        system("ld -o ../blaOut/out ../blaOut/out.o");
+        system("nasm -felf64 ../blastOut/out.asm");
+        system("ld -o ../blastOut/out ../blastOut/out.o");
     }
     std::cout << "      Compiling successful\n|==============================|\n" << std::endl;
 
