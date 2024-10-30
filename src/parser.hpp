@@ -448,7 +448,7 @@ public:
 
             // ident
             auto reassignStmt = m_allocator.alloc<ReassignStmtNode>();
-            reassignStmt ->ident = consume();
+            reassignStmt->ident = consume();
 
             if (!m_idents.contains(reassignStmt->ident.value.value())) {
                 failUndeclaredIdentifer(reassignStmt->ident.value.value(), m_lineNumber);
@@ -457,7 +457,7 @@ public:
             consumeLineBreaks();
 
             if (peek().value().type != TokenType::eq) {
-                failMissingOperator("reassignment without equal sign", m_lineNumber);
+                failMissingOperator("Reassignment without equal sign", m_lineNumber);
             }
 
             // equal sign

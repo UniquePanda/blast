@@ -1,7 +1,7 @@
 # doing:
+- pointers
 
 # basic todos:
-- pointers
 - additional unary operations (e.g. !)
 - while loops
 - for loops

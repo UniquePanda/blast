@@ -4,6 +4,7 @@
 #include <cassert>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 #include <unordered_map>
 #include <map>
 #include <variant>
@@ -15,32 +16,44 @@ class Generator {
 public:
     Generator(ProgNode prog) : m_prog(std::move(prog)) {}
 
-    void generateTerm(const TermNode* term, const std::vector<Token> unaryOperators = {}) {
+    TokenType generateTerm(const TermNode* term, const std::vector<Token> unaryOperators = {}, bool isReassignment = false) {
         struct TermVisitor {
             Generator& generator;
             const std::vector<Token>& unaryOperators;
+            bool& isReassignment;
 
-            void operator()(const IntLitTermNode* intLitTerm) const {
+            TokenType operator()(const IntLitTermNode* intLitTerm) const {
                 std::string valueString = negUnOperatorCondensed(unaryOperators) + intLitTerm->int_lit.value.value();
                 generator.m_codeSectionAsmOutput << "    mov rax, " << valueString << "\n";
-                generator.pushInternalIntVar("rax");
+
+                if (!isReassignment) {
+                    generator.pushInternalIntVar("rax");
+                }
+
+                return TokenType::int_lit;
             }
 
-            void operator()(const DblLitTermNode* dblLitTerm) const {
+            TokenType operator()(const DblLitTermNode* dblLitTerm) const {
                 std::string valueString = negUnOperatorCondensed(unaryOperators) + dblLitTerm->dbl_lit.value.value();
                 auto dataLoc = generator.addDoubleToDataSection(std::stod(valueString));
 
                 generator.m_codeSectionAsmOutput << "    mov rax, dbl" << dataLoc << "\n";
-                generator.pushConst(
-                    "rax",
-                    generator.internalConstIdent(dataLoc, "DBL"),
-                    TokenType::dbl_lit,
-                    dataLoc,
-                    valueString
-                );
+
+
+                if (!isReassignment) {
+                    generator.pushConst(
+                        "rax",
+                        generator.internalConstIdent(dataLoc, "DBL"),
+                        TokenType::dbl_lit,
+                        dataLoc,
+                        valueString
+                    );
+                }
+
+                return TokenType::dbl_lit;
             }
 
-            void operator()(const StrLitTermNode* strLitTerm) const {
+            TokenType operator()(const StrLitTermNode* strLitTerm) const {
                 if (unaryOperators.size() > 0) {
                     failUexpectedUnaryOperator(unOpSymbol(unaryOperators.back().type), generator.m_lineNumber);
                 }
@@ -48,16 +61,21 @@ public:
                 auto dataLoc = addStringToDataSection(strLitTerm->str_lit.value.value());
 
                 generator.m_codeSectionAsmOutput << "    mov rax, string" << dataLoc << "\n";
-                generator.pushConst(
-                    "rax",
-                    generator.internalConstIdent(dataLoc, "STRING"),
-                    TokenType::str_lit,
-                    dataLoc,
-                    strLitTerm->str_lit.value.value()
-                );
+
+                if (!isReassignment) {
+                    generator.pushConst(
+                        "rax",
+                        generator.internalConstIdent(dataLoc, "STRING"),
+                        TokenType::str_lit,
+                        dataLoc,
+                        strLitTerm->str_lit.value.value()
+                    );
+                }
+
+                return TokenType::str_lit;
             }
 
-            void operator()(const BoolLitTermNode* boolLitTerm) const {
+            TokenType operator()(const BoolLitTermNode* boolLitTerm) const {
                 // + and - turn bool into an integer
                 bool hasUnPlusMinus = false;
                 for (Token unOperator : unaryOperators) {
@@ -70,14 +88,22 @@ public:
                 std::string valueString = (hasUnPlusMinus ? negUnOperatorCondensed(unaryOperators) : "") + (boolLitTerm->bool_lit.value.value() == "true" ? "1" : "0");
                 generator.m_codeSectionAsmOutput << "    mov rax, " << valueString << "\n";
 
+                if (!isReassignment) {
+                    if (hasUnPlusMinus) {
+                        generator.pushInternalIntVar("rax");
+                    } else {
+                        generator.pushInternalBoolVar("rax");
+                    }
+                }
+
                 if (hasUnPlusMinus) {
-                    generator.pushInternalIntVar("rax");
+                    return TokenType::int_lit;
                 } else {
-                    generator.pushInternalBoolVar("rax");
+                    return TokenType::bool_lit;
                 }
             }
 
-            void operator()(const IdentTermNode* identTerm) const {
+            TokenType operator()(const IdentTermNode* identTerm) const {
                 auto identName = identTerm->ident.value.value();
                 bool isConst = generator.m_consts.contains(identName);
                 if (!isConst && !generator.m_vars.contains(identName)) {
@@ -110,9 +136,11 @@ public:
                             dataLoc,
                             valueString
                         );
+                        return TokenType::dbl_lit;
                     } else {
                         generator.m_codeSectionAsmOutput << "    mov rax, " << typeIdent << cons.dataLoc << "\n";
                         generator.pushConst("rax", identName);
+                        return cons.type;
                     }
                 } else {
                     const auto& var = generator.m_vars.at(identName);
@@ -139,25 +167,32 @@ public:
                             generator.m_codeSectionAsmOutput << "    mov rax, " << stackLocation.str() << "\n";
                             generator.m_codeSectionAsmOutput << "    neg rax" << "\n";
                             generator.pushInternalIntVar("rax");
+                            return TokenType::int_lit;
                         } else if (var.type == TokenType::dbl_lit) {
                             generator.m_codeSectionAsmOutput << "    movq xmm0, " << stackLocation.str() << "\n";
                             generator.m_codeSectionAsmOutput << "    movq xmm1, [FLIP_S_64B]\n";
                             generator.m_codeSectionAsmOutput << "    xorps xmm0, xmm1\n";
                             generator.pushInternalDblVar("xmm0");
+                            return TokenType::dbl_lit;
                         } else {
                             failUexpectedUnaryOperator(unOpSymbol(unaryOperators.back().type), generator.m_lineNumber);
                         }
                     } else if (hasUnPlusMinus && var.type == TokenType::bool_lit) {
                         generator.m_codeSectionAsmOutput << "    mov rax, " << stackLocation.str() << "\n";
                         generator.pushInternalIntVar("rax");
+                        return TokenType::int_lit;
                     } else {
                         generator.pushVar(stackLocation.str(), identName, var.type);
+                        return var.type;
                     }
+
+                    // Should never happen.
+                    throw std::invalid_argument("TermVisitor didn't reach return value. This should never happen.");
                 }
             }
 
-            void operator()(const ParenTermNode* parenTerm) const {
-                generator.generateExpr(parenTerm->expr, unaryOperators);
+            TokenType operator()(const ParenTermNode* parenTerm) const {
+                return generator.generateExpr(parenTerm->expr, unaryOperators);
             }
 
             size_t addStringToDataSection(std::string str) const {
@@ -185,15 +220,15 @@ public:
             }
         };
 
-        TermVisitor visitor({ .generator = *this, .unaryOperators = unaryOperators });
-        std::visit(visitor, term->var);
+        TermVisitor visitor({ .generator = *this, .unaryOperators = unaryOperators, .isReassignment = isReassignment });
+        return std::visit(visitor, term->var);
     }
 
-    void generateExpr(const ExprNode* expr, const std::vector<Token> unaryOperators = {}) {
+    TokenType generateExpr(const ExprNode* expr, const std::vector<Token> unaryOperators = {}, bool isReassignment = false) {
         struct BinExprVisitor {
             Generator& generator;
 
-            void operator()(const SumBinExprNode* sumBinExpr) const {
+            TokenType operator()(const SumBinExprNode* sumBinExpr) const {
                 generator.generateExpr(sumBinExpr->lhs);
                 generator.generateExpr(sumBinExpr->rhs);
 
@@ -219,10 +254,10 @@ public:
                     generator.m_codeSectionAsmOutput << "    addsd xmm0, xmm1\n";
                 }
 
-                pushResult(shouldPushDbl);
+                return pushResult(shouldPushDbl);
             }
 
-            void operator()(const SubBinExprNode* subBinExpr) const {
+            TokenType operator()(const SubBinExprNode* subBinExpr) const {
                 generator.generateExpr(subBinExpr->lhs);
                 generator.generateExpr(subBinExpr->rhs);
 
@@ -248,10 +283,10 @@ public:
                     generator.m_codeSectionAsmOutput << "    subsd xmm0, xmm1\n";
                 }
 
-                pushResult(shouldPushDbl);
+                return pushResult(shouldPushDbl);
             }
 
-            void operator()(const MulBinExprNode* mulBinExpr) const {
+            TokenType operator()(const MulBinExprNode* mulBinExpr) const {
                 generator.generateExpr(mulBinExpr->lhs);
                 generator.generateExpr(mulBinExpr->rhs);
 
@@ -277,10 +312,10 @@ public:
                     generator.m_codeSectionAsmOutput << "    mulsd xmm0, xmm1\n";
                 }
 
-                pushResult(shouldPushDbl);
+                return pushResult(shouldPushDbl);
             }
 
-            void operator()(const DivBinExprNode* divBinExpr) const {
+            TokenType operator()(const DivBinExprNode* divBinExpr) const {
                 generator.generateExpr(divBinExpr->lhs);
                 generator.generateExpr(divBinExpr->rhs);
 
@@ -307,37 +342,40 @@ public:
                     generator.m_codeSectionAsmOutput << "    DIVSD xmm0, xmm1\n";
                 }
 
-                pushResult(shouldPushDbl);
+                return pushResult(shouldPushDbl);
             }
 
-            void pushResult(const bool& shouldPushDbl) const {
+            TokenType pushResult(const bool& shouldPushDbl) const {
                 if (shouldPushDbl) {
                     generator.pushInternalDblVar("xmm0");
+                    return TokenType::dbl_lit;
                 } else {
                     generator.pushInternalIntVar("rax");
+                    return TokenType::int_lit;
                 }
             }
         };
 
         struct ExprVisitor {
             Generator& generator;
+            bool& isReassignment;
 
-            void operator()(const TermNode* term) const {
-                generator.generateTerm(term);
+            TokenType operator()(const TermNode* term) const {
+                return generator.generateTerm(term, {}, isReassignment);
             }
 
-            void operator()(const BinExprNode* binExpr) const {
+            TokenType operator()(const BinExprNode* binExpr) const {
                 BinExprVisitor visitor({.generator = generator});
-                std::visit(visitor, binExpr->var);
+                return std::visit(visitor, binExpr->var);
             }
 
-            void operator()(const UnExprNode* unExpr) const {
-                generator.generateTerm(unExpr->term, unExpr->operators);
+            TokenType operator()(const UnExprNode* unExpr) const {
+                return generator.generateTerm(unExpr->term, unExpr->operators, isReassignment);
             }
         };
 
-        ExprVisitor visitor({.generator = *this});
-        std::visit(visitor, expr->var);
+        ExprVisitor visitor({.generator = *this, .isReassignment = isReassignment});
+        return std::visit(visitor, expr->var);
     }
 
     void generateScope(const ScopeNode* scope) {
@@ -486,7 +524,7 @@ public:
                 std::string ident = reassignStmt->ident.value.value();
                 auto expr = reassignStmt->expr;
 
-                generator.assignment(ident, expr);
+                generator.assignment(ident, expr, ident);
             }
 
             void operator()(const ScopeNode* scope) const {
@@ -808,7 +846,9 @@ private:
         return ".label" + std::to_string(m_labelCount++);
     }
 
-    void assignment(std::string ident, ExprNode* expr) {
+    void assignment(std::string ident, ExprNode* expr, std::string reassignedIdentifier = "") {
+        bool isReassignment = !reassignedIdentifier.empty();
+
         TokenType tokenType = {};
 
         bool isTermNode = std::holds_alternative<TermNode*>(expr->var);
@@ -830,6 +870,7 @@ private:
                 tokenType = TokenType::int_lit;
             }
 
+            // todo: this can set doubles as vars?
             m_vars.insert_or_assign(ident, Var { .stackLoc = identStackLoc, .type = tokenType });
             addToOrderedVarsIfNew(ident);
 
@@ -848,7 +889,7 @@ private:
             // As the parser is already replacing `-(...)` with `-1 * (...)` we don't have to care about unary expression.
             if (std::holds_alternative<ParenTermNode*>(term->var)) {
                 ParenTermNode* parenTerm = std::get<ParenTermNode*>(term->var);
-                assignment(ident, parenTerm->expr);
+                assignment(ident, parenTerm->expr, reassignedIdentifier);
                 return;
             }
         } else {
@@ -969,11 +1010,37 @@ private:
         if (tokenType == TokenType::str_lit || tokenType == TokenType::dbl_lit) {
             m_consts.insert_or_assign(ident, Const { .dataLoc = m_dataSize, .valueAtDataLoc = constValue, .type = tokenType, .valueLength = valueLength });
         } else {
-            m_vars.insert_or_assign(ident, Var { .stackLoc = m_stackSize, .type = tokenType });
-            addToOrderedVarsIfNew(ident);
+            // todo: just experimenting
+            if (!isReassignment) {
+                m_vars.insert_or_assign(ident, Var { .stackLoc = m_stackSize, .type = tokenType });
+                addToOrderedVarsIfNew(ident);
+            }
         }
 
-        generateExpr(expr);
+        TokenType producedTokenType = generateExpr(expr,{}, isReassignment);
+
+        if (!isReassignment) {
+            return;
+        }
+
+        TokenType reassignedTokenType = {};
+        if (m_consts.contains(ident)) {
+            reassignedTokenType = m_consts.at(ident).type;
+        }
+        if (m_vars.contains(ident)) {
+            reassignedTokenType = m_vars.at(ident).type;
+        }
+
+        if (reassignedTokenType != producedTokenType) {
+            failInvalidReassignment(tokenTypeName(reassignedTokenType), m_lineNumber);
+        }
+
+
+        if (tokenType == TokenType::int_lit) {
+            m_codeSectionAsmOutput << "    add rsp, " << (m_stackSize - m_vars.at(ident).stackLoc - 1) * 8 << "\n";
+            m_codeSectionAsmOutput << "    mov [rsp], rax\n";
+            m_codeSectionAsmOutput << "    sub rsp, " << (m_stackSize - m_vars.at(ident).stackLoc - 1) * 8 << "\n";
+        }
     }
 
     void addToOrderedVarsIfNew(std::string ident) {

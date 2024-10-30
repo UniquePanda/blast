@@ -1,1 +1,5 @@
 // add any bla code that needs debugging
+
+let a = 5;
+a = "def";
+println(a);
