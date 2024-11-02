@@ -6,7 +6,7 @@
 
 #include "./utils.hpp"
 
-const std::vector<std::string> BUILT_IN_FUNC_NAMES {"print", "println", "exit"};
+const std::vector<std::string> BUILT_IN_FUNC_NAMES {"print", "println", "exit", "asm"};
 
 class Tokenizer {
 public:

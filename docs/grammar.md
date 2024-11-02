@@ -80,6 +80,7 @@ $$
             \text{exit'('int\_lit')'} & \text{Exit program with given exit code} \\
             \text{print'('[Expr]')'} & \text{Print given input to stdout} \\
             \text{println'('[Expr]')'} & \text{Print given input with added line break to stdout} \\
+            \text{asm'('str\_lit')'} & \text{Write raw assembly into the generated assembly at this location.} \\
         \end{cases}
     \\
 \end{align}

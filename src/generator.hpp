@@ -394,7 +394,9 @@ public:
             Generator& generator;
 
             void operator()(const BuiltInFuncStmtNode* builtInFuncStmt) const {
-                generator.generateExpr(builtInFuncStmt->expr);
+                if (builtInFuncStmt->funcName != "asm") {
+                    generator.generateExpr(builtInFuncStmt->expr);
+                }
 
                 if (builtInFuncStmt->funcName == "exit") {
                     generator.m_codeSectionAsmOutput << "    mov rax, 60\n"; // sys_exit
@@ -495,6 +497,12 @@ public:
                         generator.m_codeSectionAsmOutput << "    add rsi, rdx\n";
                         generator.m_codeSectionAsmOutput << "    mov [rsi], r8b\n";
                     }
+                } else if (builtInFuncStmt->funcName == "asm") {
+                    // We know that the statement contains a TermNode with a string literal because the parser is already checking that.
+                    TermNode* term = std::get<TermNode*>(builtInFuncStmt->expr->var);
+                    std::string str = std::get<StrLitTermNode*>(term->var)->str_lit.value.value();
+
+                    generator.m_codeSectionAsmOutput << "    " << str << "\n";
                 } else {
                     failUnknownBuiltInFunc(builtInFuncStmt->funcName, generator.m_lineNumber);
                 }

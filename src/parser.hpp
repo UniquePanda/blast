@@ -374,6 +374,17 @@ public:
 
             if (auto exprNode = parseExpr()) {
                 builtInFuncStmt->expr = exprNode.value();
+
+                if (builtInFuncStmt->funcName == "asm") {
+                    if (!std::holds_alternative<TermNode*>(builtInFuncStmt->expr->var)) {
+                        failUnexpectedDataType("Expected 'string' to be passed to asm() function.", m_lineNumber);
+                    }
+
+                    TermNode* term = std::get<TermNode*>(builtInFuncStmt->expr->var);
+                    if (!std::holds_alternative<StrLitTermNode*>(term->var)) {
+                        failUnexpectedDataType("Expected 'string' to be passed to asm() function.", m_lineNumber);
+                    }
+                }
             } else {
                 failInvalidExpr("Unknown expression as function parameter", m_lineNumber);
             }
