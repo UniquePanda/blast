@@ -68,6 +68,7 @@ $$
     [\text{Term}] &\to
         \begin{cases}
             \text{ident} \\
+            \text{ '\$' } \text{ident} & \text{Reference (Pointer)} \\
             \text{int\_lit} \\
             \text{dbl\_lit} \\
             \text{str\_lit} \\
