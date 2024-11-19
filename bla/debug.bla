@@ -1,2 +1,13 @@
 // add any Blast code that needs debugging
 
+// broken, prints 1.0
+let a = 1.0;
+a = 1.0 + 1.0;
+println(a);
+
+/*
+// broken, out of range
+let b = 3 * 3.0;
+b = 5 / 2.0;
+println(b);
+*/

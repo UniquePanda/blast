@@ -24,7 +24,7 @@ let e
     )
     / 2;
 
-// Test assignment of identifier to another identifer
+// Test assignment of identifier to another identifier
 let e2 = e;
 
 print(
@@ -245,12 +245,18 @@ let z = -0.75 * -40;
 println(z);
 println("--");
 
-println("# Reassign identifiers (1, 2.5, 'abc', false)...");
+println("# Reassign identifiers (1, 3, 28, 2.5, 'abc', false)...");
 let a1 = 5;
 a1 = 1;
 println(a1);
 
-let b1 = 3 * 3;
+a1 = a1 * 3;
+println(a1);
+
+a1 = 4 * 7;
+println(a1);
+
+let b1 = 3 * 3.0;
 b1 = 5 / 2.0;
 println(b1);
 

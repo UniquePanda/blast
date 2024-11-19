@@ -69,7 +69,7 @@ public:
                 buf.push_back(consume());
 
                 if (!peek().has_value() || !std::isdigit(peek().value())) {
-                    failUnxpectedNonDigit(peek().has_value() ? peek().value() : ' ', m_lineNumber);
+                    failUnexpectedNonDigit(peek().has_value() ? peek().value() : ' ', m_lineNumber);
                 }
 
                 while (peek().has_value() && std::isdigit(peek().value())) {
@@ -99,7 +99,7 @@ public:
                                 buf.push_back(consume());
                                 continue;
                             } else {
-                                failUnxpectedEscape(peek().value(), m_lineNumber);
+                                failUnexpectedEscape(peek().value(), m_lineNumber);
                             }
                         }
                     }

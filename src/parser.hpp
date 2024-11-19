@@ -171,7 +171,7 @@ public:
             return term;
         } else if (peek().value().type == TokenType::ident) {
             if (!m_idents.contains(peek().value().value.value())) {
-                failUndeclaredIdentifer(peek().value().value.value(), m_lineNumber);
+                failUndeclaredIdentifier(peek().value().value.value(), m_lineNumber);
             }
 
             auto identTerm = m_allocator.alloc<IdentTermNode>();
@@ -264,14 +264,14 @@ public:
         std::optional<TermNode*> lhsTerm = parseTerm();
         if (!lhsTerm.has_value()) {
             if (hasUnaryOperators) {
-                failUexpectedUnaryOperator(unOpSymbol(unaryOperators.back().type), m_lineNumber);
+                failUnexpectedUnaryOperator(unOpSymbol(unaryOperators.back().type), m_lineNumber);
             } else {
                 return {};
             }
         }
 
         if (hasUnaryOperators && std::holds_alternative<StrLitTermNode*>(lhsTerm.value()->var)) {
-            failUexpectedUnaryOperator(unOpSymbol(unaryOperators.back().type), m_lineNumber);
+            failUnexpectedUnaryOperator(unOpSymbol(unaryOperators.back().type), m_lineNumber);
         }
 
         if (hasUnaryOperators) {
@@ -462,7 +462,7 @@ public:
             reassignStmt->ident = consume();
 
             if (!m_idents.contains(reassignStmt->ident.value.value())) {
-                failUndeclaredIdentifer(reassignStmt->ident.value.value(), m_lineNumber);
+                failUndeclaredIdentifier(reassignStmt->ident.value.value(), m_lineNumber);
             }
 
             consumeLineBreaks();

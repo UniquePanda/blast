@@ -18,7 +18,7 @@ struct Token {
     std::optional<std::string> value {};
 };
 
-std::string negUnOperatorCondensed(std::vector<Token> unaryOperators) {
+std::string negUnOperatorCondensed(std::vector<Token> unaryOperators) {;
     int minusCount = 0;
     for (const Token unOperator : unaryOperators) {
         if (unOperator.type == TokenType::minus) {
@@ -102,7 +102,7 @@ void fail(const std::string& msg, const size_t& lineNumber) {
     exit(EXIT_FAILURE);
 }
 
-void failUnxpectedEscape(const char& unknownEscapedChar, const size_t& lineNumber) {
+void failUnexpectedEscape(const char& unknownEscapedChar, const size_t& lineNumber) {
     fail("Unexpected escape sequence: \\" + std::string(1, unknownEscapedChar), lineNumber);
 }
 
@@ -110,7 +110,7 @@ void failUnknownChar(const char& unknownChar, const size_t& lineNumber) {
     fail("Unknown character: " + std::string(1, unknownChar), lineNumber);
 }
 
-void failUnxpectedNonDigit(const char&  unexpectedChar, const size_t& lineNumber) {
+void failUnexpectedNonDigit(const char&  unexpectedChar, const size_t& lineNumber) {
     fail("Unexpected non-digit character" + (unexpectedChar != ' ' ? ": " + std::string(1, unexpectedChar) : ""), lineNumber);
 }
 
@@ -150,7 +150,7 @@ void failMissingStmt(const std::string& stmtName, const size_t& lineNumber) {
     fail("Missing statement" + (stmtName == "" ? "" : ": " + stmtName), lineNumber);
 }
 
-void failUexpectedUnaryOperator(const std::string& op, const size_t& lineNumber) {
+void failUnexpectedUnaryOperator(const std::string& op, const size_t& lineNumber) {
     fail("Unexpected unary operator: " + op, lineNumber);
 }
 
@@ -186,11 +186,11 @@ void failMissingSemi(const size_t& lineNumber) {
     fail("Missing semicolon", lineNumber);
 }
 
-void failAlreadyUsedIdentifer(const std::string& identName, const size_t& lineNumber) {
+void failAlreadyUsedIdentifier(const std::string& identName, const size_t& lineNumber) {
     fail("Identifier already used: " + identName, lineNumber);
 }
 
-void failUndeclaredIdentifer(const std::string& identName, const size_t& lineNumber) {
+void failUndeclaredIdentifier(const std::string& identName, const size_t& lineNumber) {
     fail("Undeclared identifier: " + identName, lineNumber);
 }
 
